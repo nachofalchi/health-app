@@ -594,7 +594,9 @@ async function syncPointDataType(
   supabase: SupabaseClient,
   accessToken: string,
   userId: string,
-  dataType: string
+  dataType: string,
+  start?: Date,
+  end?: Date
 ) {
   let pageToken: string | undefined;
   let pageCount = 0;
@@ -612,6 +614,16 @@ async function syncPointDataType(
     if (!payload.dataPoints?.length) counters.empty += 1;
 
     for (const point of payload.dataPoints ?? []) {
+      const times = extractPointTimes(dataType, point);
+      const pointTimeStr = times.sampleTime || times.intervalStart;
+      
+      if (pointTimeStr && start && end) {
+        const ptDate = new Date(pointTimeStr);
+        if (ptDate < start || ptDate > end) {
+          continue;
+        }
+      }
+
       await upsertRawDatapoint(supabase, userId, dataType, point);
       counters.raw += 1;
 
@@ -644,8 +656,24 @@ export async function syncGoogleHealth(supabase: SupabaseClient, userId: string)
   const end = new Date();
   const rollupEnd = new Date(end);
   rollupEnd.setUTCDate(rollupEnd.getUTCDate() + 1);
+
+  // Check if there are any previous successful sync runs for this user
+  const { count, error: countError } = await supabase
+    .from("sync_runs")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
+
+  const isFirstSync = countError || count === null || count === 0;
+
   const start = new Date(end);
-  start.setDate(end.getDate() - 80);
+  if (isFirstSync) {
+    // First sync is exhaustive (e.g. 80 days of history)
+    start.setDate(end.getDate() - 80);
+  } else {
+    // Subsequent syncs are short (current and previous day = 2 days total)
+    start.setDate(end.getDate() - 1);
+  }
+
   const counters: SyncCounters = {
     dailyMetrics: 0,
     rawDatapoints: 0,
@@ -677,7 +705,7 @@ export async function syncGoogleHealth(supabase: SupabaseClient, userId: string)
 
     for (const dataType of pointDataTypes) {
       try {
-        const result = await syncPointDataType(supabase, accessToken, userId, dataType);
+        const result = await syncPointDataType(supabase, accessToken, userId, dataType, start, rollupEnd);
         counters.rawDatapoints += result.raw;
         counters.bodyMeasurements += result.body;
         counters.exercises += result.exercises;
