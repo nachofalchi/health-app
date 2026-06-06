@@ -57,6 +57,10 @@ export type CategoryDetail = {
     cardioLoad: number;
     cardioLoadLabel: "Baja" | "Media" | "Alta";
   }> | null;
+  logHeaders?: string[];
+  logFields?: string[];
+  logs?: Array<Record<string, string | number>>;
+  bpLogs?: Array<{ dateTime: string; pressure: string; pulse: string }> | null;
 };
 
 function formatNumber(value: number | null | undefined) {
@@ -156,7 +160,13 @@ function demoCategory(slug: CategorySlug): CategoryDetail {
       title: "Proyeccion",
       value: "sin baseline",
       body: "La proyeccion real necesita varias semanas de datos sincronizados."
-    }
+    },
+    logHeaders: ["Fecha", "Dato Demo A", "Dato Demo B"],
+    logFields: ["date", "valA", "valB"],
+    logs: [
+      { date: "Hoy", valA: "85", valB: "Normal" },
+      { date: "Ayer", valA: "80", valB: "Normal" }
+    ]
   };
 }
 
@@ -335,7 +345,20 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
         rem: latestSleep.rem_sleep_minutes ?? 0,
         light: latestSleep.light_sleep_minutes ?? 0,
         awake: latestSleep.awake_minutes ?? 0
-      } : null
+      } : null,
+      logHeaders: ["Fecha", "Duración", "Profundo", "REM", "Ligero", "Despierto"],
+      logFields: ["date", "duration", "deep", "rem", "light", "awake"],
+      logs: metrics
+        .filter((m) => m.sleep_minutes !== null)
+        .slice(0, 10)
+        .map((m) => ({
+          date: new Date(m.date).toLocaleDateString("es-AR", { day: "numeric", month: "short" }),
+          duration: formatMinutes(m.sleep_minutes),
+          deep: m.deep_sleep_minutes ? `${m.deep_sleep_minutes} min` : "--",
+          rem: m.rem_sleep_minutes ? `${m.rem_sleep_minutes} min` : "--",
+          light: m.light_sleep_minutes ? `${m.light_sleep_minutes} min` : "--",
+          awake: m.awake_minutes ? `${m.awake_minutes} min` : "--"
+        }))
     };
   }
 
@@ -394,7 +417,18 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
         directionColor: proj.directionColor,
         confidence: proj.confidence
       },
-      exercises: exercisesList
+      exercises: exercisesList,
+      logHeaders: ["Fecha", "Pasos", "Calorías", "Activo"],
+      logFields: ["date", "steps", "calories", "active"],
+      logs: metrics
+        .filter((m) => m.steps !== null)
+        .slice(0, 10)
+        .map((m) => ({
+          date: new Date(m.date).toLocaleDateString("es-AR", { day: "numeric", month: "short" }),
+          steps: m.steps !== null ? m.steps.toLocaleString("es-AR") : "--",
+          calories: m.calories_kcal ? `${Math.round(m.calories_kcal)} kcal` : "--",
+          active: m.active_minutes ? `${m.active_minutes} min` : "--"
+        }))
     };
   }
 
@@ -440,7 +474,19 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
         directionArrow: proj.directionArrow,
         directionColor: proj.directionColor,
         confidence: proj.confidence
-      }
+      },
+      logHeaders: ["Fecha", "Peso", "Grasa Corporal"],
+      logFields: ["date", "weight", "bodyFat"],
+      logs: body.slice(0, 10).map((b) => ({
+        date: new Date(b.measured_at).toLocaleString("es-AR", {
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit"
+        }),
+        weight: b.weight_kg ? `${b.weight_kg.toFixed(1)} kg` : "--",
+        bodyFat: b.body_fat_percentage ? `${b.body_fat_percentage.toFixed(1)}%` : "--"
+      }))
     };
   }
 
@@ -483,7 +529,26 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
         directionArrow: proj.directionArrow,
         directionColor: proj.directionColor,
         confidence: proj.confidence
-      }
+      },
+      logHeaders: ["Fecha", "FC Reposo"],
+      logFields: ["date", "restingHr"],
+      logs: metrics
+        .filter((m) => m.resting_hr !== null)
+        .slice(0, 10)
+        .map((m) => ({
+          date: new Date(m.date).toLocaleDateString("es-AR", { day: "numeric", month: "short" }),
+          restingHr: m.resting_hr ? `${Math.round(m.resting_hr)} bpm` : "--"
+        })),
+      bpLogs: pressure.slice(0, 10).map((p) => ({
+        dateTime: new Date(p.measured_at).toLocaleString("es-AR", {
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit"
+        }),
+        pressure: `${p.systolic}/${p.diastolic} mmHg`,
+        pulse: p.pulse ? `${p.pulse} bpm` : "--"
+      }))
     };
   }
 
@@ -558,6 +623,17 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
       directionColor: proj.directionColor,
       confidence: proj.confidence
     },
-    anomalies: anomaliesList.length ? anomaliesList : null
+    anomalies: anomaliesList.length ? anomaliesList : null,
+    logHeaders: ["Fecha", "HRV", "FC Reposo", "Sueño"],
+    logFields: ["date", "hrv", "restingHr", "sleep"],
+    logs: metrics
+      .filter((m) => m.hrv !== null || m.resting_hr !== null || m.sleep_minutes !== null)
+      .slice(0, 10)
+      .map((m) => ({
+        date: new Date(m.date).toLocaleDateString("es-AR", { day: "numeric", month: "short" }),
+        hrv: m.hrv ? `${Math.round(m.hrv)} ms` : "--",
+        restingHr: m.resting_hr ? `${Math.round(m.resting_hr)} bpm` : "--",
+        sleep: m.sleep_minutes ? formatMinutes(m.sleep_minutes) : "--"
+      }))
   };
 }

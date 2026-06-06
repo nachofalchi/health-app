@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { Activity, ArrowLeft, BatteryCharging, HeartPulse, Moon, Scale, Smile, TrendingUp } from "lucide-react";
+import { Activity, ArrowLeft, BatteryCharging, HeartPulse, Moon, Scale, Smile, TrendingUp, ClipboardList } from "lucide-react";
 import { getCategoryDetail, type CategorySlug } from "@/lib/category-data";
 import { TrendChart } from "@/components/trend-chart";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -198,6 +198,64 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
                   </div>
                 </div>
               ))}
+            </div>
+          </article>
+        )}
+
+        {detail.logs && detail.logs.length > 0 && (
+          <article className="chart-panel" style={{ gridColumn: "1 / -1", padding: "24px" }}>
+            <div className="section-title">
+              <ClipboardList size={22} aria-hidden />
+              <h2>Historial de Mediciones</h2>
+            </div>
+            <div className="logs-table-container">
+              <table className="logs-table">
+                <thead>
+                  <tr>
+                    {detail.logHeaders?.map((header) => (
+                      <th key={header}>{header}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {detail.logs.map((log, i) => (
+                    <tr key={i}>
+                      {detail.logFields?.map((field) => (
+                        <td key={field}>{log[field]}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
+        )}
+
+        {detail.bpLogs && detail.bpLogs.length > 0 && (
+          <article className="chart-panel" style={{ gridColumn: "1 / -1", padding: "24px" }}>
+            <div className="section-title">
+              <ClipboardList size={22} aria-hidden />
+              <h2>Registros de Presión Arterial</h2>
+            </div>
+            <div className="logs-table-container">
+              <table className="logs-table">
+                <thead>
+                  <tr>
+                    <th>Fecha / Hora</th>
+                    <th>Presión</th>
+                    <th>Pulso</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detail.bpLogs.map((bp, i) => (
+                    <tr key={i}>
+                      <td>{bp.dateTime}</td>
+                      <td>{bp.pressure}</td>
+                      <td>{bp.pulse}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </article>
         )}
