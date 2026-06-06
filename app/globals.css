@@ -2118,6 +2118,10 @@ label:has(input[name="heavy_meal_at_night"]:checked) .heavymeal-chip {
 [data-theme="dark"] .stat-panel,
 [data-theme="dark"] .metrics-grid-panel,
 [data-theme="dark"] .log-form-panel,
+[data-theme="dark"] .category-metrics,
+[data-theme="dark"] .category-score-panel,
+[data-theme="dark"] .chart-panel,
+[data-theme="dark"] .projection-panel,
 [data-theme="dark"] .settings-section {
   border: 1px solid var(--line);
 }
