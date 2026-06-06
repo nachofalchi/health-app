@@ -25,6 +25,21 @@ export type BodyMeasurement = {
   measured_at: string;
   weight_kg: number | null;
   body_fat_percentage: number | null;
+  muscle_mass_kg: number | null;
+  water_percentage: number | null;
+  neck_cm: number | null;
+  shoulders_chest_cm: number | null;
+  arm_right_relaxed_cm: number | null;
+  arm_right_contracted_cm: number | null;
+  arm_left_relaxed_cm: number | null;
+  arm_left_contracted_cm: number | null;
+  waist_cm: number | null;
+  abdomen_cm: number | null;
+  hips_cm: number | null;
+  thigh_right_cm: number | null;
+  thigh_left_cm: number | null;
+  calf_right_cm: number | null;
+  calf_left_cm: number | null;
   source_platform: string | null;
 };
 

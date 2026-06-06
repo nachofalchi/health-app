@@ -61,6 +61,7 @@ export type CategoryDetail = {
   logFields?: string[];
   logs?: Array<Record<string, string | number>>;
   bpLogs?: Array<{ dateTime: string; pressure: string; pulse: string }> | null;
+  latestBodyMeasurement?: BodyMeasurement | null;
 };
 
 function formatNumber(value: number | null | undefined) {
@@ -239,7 +240,7 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
     const bodyPromise = safeQuery(
       supabase
         .from("body_measurements")
-        .select("measured_at,weight_kg,body_fat_percentage")
+        .select("measured_at,weight_kg,body_fat_percentage,muscle_mass_kg,water_percentage,neck_cm,shoulders_chest_cm,arm_right_relaxed_cm,arm_right_contracted_cm,arm_left_relaxed_cm,arm_left_contracted_cm,waist_cm,abdomen_cm,hips_cm,thigh_right_cm,thigh_left_cm,calf_right_cm,calf_left_cm")
         .eq("user_id", userId)
         .order("measured_at", { ascending: false })
         .limit(30)
@@ -497,7 +498,8 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
         }),
         weight: b.weight_kg ? `${b.weight_kg.toFixed(1)} kg` : "--",
         bodyFat: b.body_fat_percentage ? `${b.body_fat_percentage.toFixed(1)}%` : "--"
-      }))
+      })),
+      latestBodyMeasurement: latestBody
     };
   }
 

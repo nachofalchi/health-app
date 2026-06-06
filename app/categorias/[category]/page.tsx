@@ -136,6 +136,120 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
           <p>{detail.projection.body}</p>
         </article>
 
+        {detail.slug === "composicion" && detail.latestBodyMeasurement && (
+          <article className="chart-panel" style={{ gridColumn: "1 / -1", padding: "24px" }}>
+            <div className="section-title" style={{ marginBottom: "18px" }}>
+              <Scale size={22} style={{ color: "var(--accent)" }} />
+              <h2>Medidas Corporales Recientes</h2>
+            </div>
+            <div className="circumference-grid" style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: "20px"
+            }}>
+              {/* Card 1: Tronco */}
+              <div style={{
+                backgroundColor: "var(--panel-2)",
+                border: "1px solid var(--line-light)",
+                borderRadius: "var(--radius-lg)",
+                padding: "16px"
+              }}>
+                <h3 style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--accent)", marginBottom: "12px", borderBottom: "1px solid var(--line-light)", paddingBottom: "6px" }}>
+                  Tronco y Cabeza
+                </h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {[
+                    { label: "Cuello", val: detail.latestBodyMeasurement.neck_cm },
+                    { label: "Pecho / Hombros", val: detail.latestBodyMeasurement.shoulders_chest_cm },
+                    { label: "Cintura", val: detail.latestBodyMeasurement.waist_cm },
+                    { label: "Abdomen (ombligo)", val: detail.latestBodyMeasurement.abdomen_cm },
+                    { label: "Cadera", val: detail.latestBodyMeasurement.hips_cm }
+                  ].map(item => (
+                    <div key={item.label} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem" }}>
+                      <span style={{ color: "var(--muted)" }}>{item.label}</span>
+                      <strong style={{ color: "var(--ink)" }}>{item.val ? `${Number(item.val).toFixed(1)} cm` : "--"}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card 2: Brazos */}
+              <div style={{
+                backgroundColor: "var(--panel-2)",
+                border: "1px solid var(--line-light)",
+                borderRadius: "var(--radius-lg)",
+                padding: "16px"
+              }}>
+                <h3 style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--accent)", marginBottom: "12px", borderBottom: "1px solid var(--line-light)", paddingBottom: "6px" }}>
+                  Brazos (cm)
+                </h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", fontSize: "0.72rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>
+                    <span>Estado</span>
+                    <span style={{ textAlign: "right" }}>Izquierdo</span>
+                    <span style={{ textAlign: "right" }}>Derecho</span>
+                  </div>
+                  {[
+                    {
+                      label: "Relajado",
+                      left: detail.latestBodyMeasurement.arm_left_relaxed_cm,
+                      right: detail.latestBodyMeasurement.arm_right_relaxed_cm
+                    },
+                    {
+                      label: "Contraído",
+                      left: detail.latestBodyMeasurement.arm_left_contracted_cm,
+                      right: detail.latestBodyMeasurement.arm_right_contracted_cm
+                    }
+                  ].map(row => (
+                    <div key={row.label} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", fontSize: "0.85rem" }}>
+                      <span style={{ color: "var(--muted)" }}>{row.label}</span>
+                      <strong style={{ textAlign: "right", color: "var(--ink)" }}>{row.left ? `${Number(row.left).toFixed(1)} cm` : "--"}</strong>
+                      <strong style={{ textAlign: "right", color: "var(--ink)" }}>{row.right ? `${Number(row.right).toFixed(1)} cm` : "--"}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card 3: Piernas */}
+              <div style={{
+                backgroundColor: "var(--panel-2)",
+                border: "1px solid var(--line-light)",
+                borderRadius: "var(--radius-lg)",
+                padding: "16px"
+              }}>
+                <h3 style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--accent)", marginBottom: "12px", borderBottom: "1px solid var(--line-light)", paddingBottom: "6px" }}>
+                  Piernas (cm)
+                </h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", fontSize: "0.72rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>
+                    <span>Parte</span>
+                    <span style={{ textAlign: "right" }}>Izquierda</span>
+                    <span style={{ textAlign: "right" }}>Derecha</span>
+                  </div>
+                  {[
+                    {
+                      label: "Muslo",
+                      left: detail.latestBodyMeasurement.thigh_left_cm,
+                      right: detail.latestBodyMeasurement.thigh_right_cm
+                    },
+                    {
+                      label: "Pantorrilla",
+                      left: detail.latestBodyMeasurement.calf_left_cm,
+                      right: detail.latestBodyMeasurement.calf_right_cm
+                    }
+                  ].map(row => (
+                    <div key={row.label} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", fontSize: "0.85rem" }}>
+                      <span style={{ color: "var(--muted)" }}>{row.label}</span>
+                      <strong style={{ textAlign: "right", color: "var(--ink)" }}>{row.left ? `${Number(row.left).toFixed(1)} cm` : "--"}</strong>
+                      <strong style={{ textAlign: "right", color: "var(--ink)" }}>{row.right ? `${Number(row.right).toFixed(1)} cm` : "--"}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </article>
+        )}
+
         {detail.slug === "sueno" && detail.sleepStages && (
           <div style={{ gridColumn: "1 / -1" }}>
             <SleepStages
