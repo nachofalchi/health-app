@@ -1,14 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
+import { GeistSans } from "geist/sans";
 import { PwaRegister } from "./pwa-register";
 import "./globals.css";
-
-const geist = localFont({
-  src: "../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2",
-  variable: "--font-geist",
-  display: "swap",
-  weight: "100 900",
-});
 
 export const metadata: Metadata = {
   title: "Salud Nacho",
@@ -30,7 +23,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="es">
-      <body className={geist.variable}>
+      <body className={GeistSans.variable}>
         <script
           dangerouslySetInnerHTML={{
             __html: `
