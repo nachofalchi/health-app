@@ -39,6 +39,37 @@ export function DashboardControlCenter() {
   const [isSaving, setIsSaving] = useState(false);
   const { toasts, show: showToast } = useToast();
 
+  const [useThreeReadings, setUseThreeReadings] = useState(false);
+  const [reading1, setReading1] = useState({ sys: "", dia: "", pulse: "" });
+  const [reading2, setReading2] = useState({ sys: "", dia: "", pulse: "" });
+  const [reading3, setReading3] = useState({ sys: "", dia: "", pulse: "" });
+
+  const calculateAverageBP = useCallback(() => {
+    const readings = [reading1, reading2, reading3].map(r => ({
+      sys: r.sys ? parseInt(r.sys, 10) : NaN,
+      dia: r.dia ? parseInt(r.dia, 10) : NaN,
+      pulse: r.pulse ? parseInt(r.pulse, 10) : NaN,
+    }));
+
+    const validSys = readings.map(r => r.sys).filter(v => !isNaN(v));
+    const validDia = readings.map(r => r.dia).filter(v => !isNaN(v));
+    const validPulse = readings.map(r => r.pulse).filter(v => !isNaN(v));
+
+    if (validSys.length === 0 || validDia.length === 0) return null;
+
+    const avgSys = Math.round(validSys.reduce((a, b) => a + b, 0) / validSys.length);
+    const avgDia = Math.round(validDia.reduce((a, b) => a + b, 0) / validDia.length);
+    const avgPulse = validPulse.length > 0 
+      ? Math.round(validPulse.reduce((a, b) => a + b, 0) / validPulse.length)
+      : undefined;
+
+    return {
+      sys: avgSys,
+      dia: avgDia,
+      pulse: avgPulse
+    };
+  }, [reading1, reading2, reading3]);
+
   // Auto-sync every 30 min
   useEffect(() => {
     async function runAutoSync() {
@@ -73,6 +104,9 @@ export function DashboardControlCenter() {
         return;
       }
       e.currentTarget.reset();
+      setReading1({ sys: "", dia: "", pulse: "" });
+      setReading2({ sys: "", dia: "", pulse: "" });
+      setReading3({ sys: "", dia: "", pulse: "" });
       showToast("Registro guardado ✓", "success");
       router.refresh();
     } catch {
@@ -134,23 +168,153 @@ export function DashboardControlCenter() {
 
           {/* TAB 1: CARDIO */}
           <div style={{ display: activeSubTab === "cardio" ? "block" : "none" }}>
-            <div className="log-field-grid">
-              <label className="log-label">
-                Sistólica
-                <input name="systolic" type="number" inputMode="numeric" min="70" max="230" placeholder="120" className="control-input" />
-                <span className="log-helper">Normal &lt; 120 mmHg</span>
-              </label>
-              <label className="log-label">
-                Diastólica
-                <input name="diastolic" type="number" inputMode="numeric" min="40" max="140" placeholder="80" className="control-input" />
-                <span className="log-helper">Normal &lt; 80 mmHg</span>
-              </label>
-              <label className="log-label" style={{ gridColumn: "1 / -1", marginTop: "8px" }}>
-                Pulso (Frecuencia cardíaca)
-                <input name="pulse" type="number" inputMode="numeric" min="30" max="220" placeholder="70" className="control-input" />
-                <span className="log-helper">Normal en reposo: 60-100 bpm</span>
+            <div style={{ 
+              display: "flex", 
+              alignItems: "center", 
+              gap: "8px", 
+              marginBottom: "16px", 
+              padding: "10px 12px", 
+              background: "var(--panel-2)", 
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--line)"
+            }}>
+              <input
+                type="checkbox"
+                id="toggle-three-readings"
+                checked={useThreeReadings}
+                onChange={(e) => setUseThreeReadings(e.target.checked)}
+                style={{ width: "16px", height: "16px", cursor: "pointer" }}
+              />
+              <label htmlFor="toggle-three-readings" style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--ink)", cursor: "pointer", userSelect: "none" }}>
+                Promediar 3 tomas consecutivas (Método Clínico)
               </label>
             </div>
+
+            {!useThreeReadings ? (
+              <div className="log-field-grid">
+                <label className="log-label">
+                  Sistólica
+                  <input name="systolic" type="number" inputMode="numeric" min="70" max="230" placeholder="120" className="control-input" />
+                  <span className="log-helper">Normal &lt; 120 mmHg</span>
+                </label>
+                <label className="log-label">
+                  Diastólica
+                  <input name="diastolic" type="number" inputMode="numeric" min="40" max="140" placeholder="80" className="control-input" />
+                  <span className="log-helper">Normal &lt; 80 mmHg</span>
+                </label>
+                <label className="log-label" style={{ gridColumn: "1 / -1", marginTop: "8px" }}>
+                  Pulso (Frecuencia cardíaca)
+                  <input name="pulse" type="number" inputMode="numeric" min="30" max="220" placeholder="70" className="control-input" />
+                  <span className="log-helper">Normal en reposo: 60-100 bpm</span>
+                </label>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {[1, 2, 3].map((num) => (
+                  <div key={num} style={{ 
+                    background: "var(--panel)", 
+                    borderRadius: "var(--radius-md)", 
+                    padding: "12px", 
+                    border: "1px solid var(--line)"
+                  }}>
+                    <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--muted)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                      Toma #{num}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                      <label className="log-label" style={{ fontSize: "0.75rem", margin: 0 }}>
+                        Sistólica
+                        <input 
+                          type="number" 
+                          placeholder="120" 
+                          min="70" 
+                          max="230"
+                          className="control-input" 
+                          value={num === 1 ? reading1.sys : num === 2 ? reading2.sys : reading3.sys}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (num === 1) setReading1(prev => ({ ...prev, sys: val }));
+                            else if (num === 2) setReading2(prev => ({ ...prev, sys: val }));
+                            else setReading3(prev => ({ ...prev, sys: val }));
+                          }}
+                        />
+                      </label>
+                      <label className="log-label" style={{ fontSize: "0.75rem", margin: 0 }}>
+                        Diastólica
+                        <input 
+                          type="number" 
+                          placeholder="80" 
+                          min="40" 
+                          max="140"
+                          className="control-input" 
+                          value={num === 1 ? reading1.dia : num === 2 ? reading2.dia : reading3.dia}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (num === 1) setReading1(prev => ({ ...prev, dia: val }));
+                            else if (num === 2) setReading2(prev => ({ ...prev, dia: val }));
+                            else setReading3(prev => ({ ...prev, dia: val }));
+                          }}
+                        />
+                      </label>
+                      <label className="log-label" style={{ fontSize: "0.75rem", margin: 0 }}>
+                        Pulso
+                        <input 
+                          type="number" 
+                          placeholder="70" 
+                          min="30" 
+                          max="220"
+                          className="control-input" 
+                          value={num === 1 ? reading1.pulse : num === 2 ? reading2.pulse : reading3.pulse}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (num === 1) setReading1(prev => ({ ...prev, pulse: val }));
+                            else if (num === 2) setReading2(prev => ({ ...prev, pulse: val }));
+                            else setReading3(prev => ({ ...prev, pulse: val }));
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Display Calculated Average and render hidden inputs for form submission */}
+                {(() => {
+                  const avg = calculateAverageBP();
+                  if (!avg) return (
+                    <div style={{ fontSize: "0.78rem", color: "var(--muted)", textAlign: "center", padding: "10px", border: "1px dashed var(--line)", borderRadius: "var(--radius-md)" }}>
+                      Completa al menos una toma para ver el promedio y poder guardar.
+                    </div>
+                  );
+                  return (
+                    <>
+                      <input type="hidden" name="systolic" value={avg.sys} />
+                      <input type="hidden" name="diastolic" value={avg.dia} />
+                      {avg.pulse !== undefined && <input type="hidden" name="pulse" value={avg.pulse} />}
+
+                      <div style={{ 
+                        background: "rgba(0, 122, 255, 0.08)", 
+                        border: "1px solid rgba(0, 122, 255, 0.2)",
+                        borderRadius: "var(--radius-md)",
+                        padding: "12px 16px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center"
+                      }}>
+                        <div>
+                          <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                            Promedio Clínico Calculado
+                          </span>
+                          <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--ink)", marginTop: "2px" }}>
+                            {avg.sys} / {avg.dia} <span style={{ fontSize: "0.85rem", fontWeight: 500, color: "var(--muted)" }}>mmHg</span>
+                            {avg.pulse ? <span style={{ marginLeft: "12px", fontSize: "0.95rem" }}>❤️ {avg.pulse} <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)" }}>bpm</span></span> : null}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: "1.5rem" }}>📊</span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
           </div>
 
           {/* TAB 2: MEDIDAS */}
