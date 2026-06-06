@@ -43,7 +43,9 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
           <ThemeToggle />
         </div>
         <div className="category-title">
-          <Icon size={34} aria-hidden />
+          <div className="cat-icon">
+            <Icon size={28} aria-hidden />
+          </div>
           <div>
             <p className="eyebrow">{detail.isReal ? "Datos reales" : "Modo demo"}</p>
             <h1>{detail.title}</h1>
