@@ -1,0 +1,34 @@
+{
+  "name": "salud-nacho",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:check": "node scripts/check-supabase.mjs",
+    "db:query": "node scripts/db-query.mjs",
+    "db:migrate": "node scripts/db-migrate.mjs"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.45.4",
+    "geist": "^1.7.2",
+    "lucide-react": "^0.468.0",
+    "next": "^15.0.3",
+    "pg": "^8.21.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.1",
+    "eslint": "^9.16.0",
+    "eslint-config-next": "^15.0.3",
+    "typescript": "^5.7.2"
+  }
+}
