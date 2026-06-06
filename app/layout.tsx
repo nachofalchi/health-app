@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { GeistSans } from "geist/sans";
+import { GeistSans } from "geist/font/sans";
 import { PwaRegister } from "./pwa-register";
 import "./globals.css";
 
