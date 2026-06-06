@@ -115,9 +115,23 @@ function extractPointTimes(dataType: string, point: Record<string, unknown>) {
   const bodyFat = asRecord(point.bodyFat);
   const exercise = asRecord(point.exercise);
   const sleep = asRecord(point.sleep);
+  const hrvObj = asRecord(point.heartRateVariability) || asRecord(point.hrv);
+  const oxygen = asRecord(point.dailyOxygenSaturation);
+  const resp = asRecord(point.dailyRespiratoryRate);
+  const restingHr = asRecord(point.dailyRestingHeartRate) || asRecord(point.restingHeartRate);
+
   const interval = asRecord(exercise?.interval) || asRecord(sleep?.interval) || asRecord(point.interval);
-  const sampleTime = asRecord(weight?.sampleTime) || asRecord(bodyFat?.sampleTime) || asRecord(point.sampleTime);
-  const physicalTime = readString(sampleTime?.physicalTime);
+  const sampleTime = asRecord(weight?.sampleTime) || asRecord(bodyFat?.sampleTime) || asRecord(hrvObj?.sampleTime) || asRecord(point.sampleTime);
+  let physicalTime = readString(sampleTime?.physicalTime);
+
+  const dateObj = restingHr?.date || oxygen?.date || resp?.date;
+  if (!physicalTime && dateObj) {
+    const dateStr = civilDateToIso(asRecord(dateObj) as any);
+    if (dateStr) {
+      physicalTime = `${dateStr}T00:00:00Z`;
+    }
+  }
+
   const startTime = readString(interval?.startTime) || physicalTime;
   const endTime = readString(interval?.endTime) || physicalTime;
 
@@ -620,7 +634,7 @@ async function syncPointDataType(
 
     pageToken = payload.nextPageToken;
     pageCount += 1;
-  } while (pageToken && pageCount < 10);
+  } while (pageToken && pageCount < 50);
 
   return counters;
 }
@@ -631,7 +645,7 @@ export async function syncGoogleHealth(supabase: SupabaseClient, userId: string)
   const rollupEnd = new Date(end);
   rollupEnd.setUTCDate(rollupEnd.getUTCDate() + 1);
   const start = new Date(end);
-  start.setDate(end.getDate() - 7);
+  start.setDate(end.getDate() - 90);
   const counters: SyncCounters = {
     dailyMetrics: 0,
     rawDatapoints: 0,
