@@ -645,7 +645,7 @@ export async function syncGoogleHealth(supabase: SupabaseClient, userId: string)
   const rollupEnd = new Date(end);
   rollupEnd.setUTCDate(rollupEnd.getUTCDate() + 1);
   const start = new Date(end);
-  start.setDate(end.getDate() - 90);
+  start.setDate(end.getDate() - 80);
   const counters: SyncCounters = {
     dailyMetrics: 0,
     rawDatapoints: 0,
