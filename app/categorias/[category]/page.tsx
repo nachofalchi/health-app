@@ -83,7 +83,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
 
       <section className="category-hero" aria-label={`Resumen de ${detail.title}`}>
         <article className="category-score-panel">
-          <div className="score-ring-container category-ring" aria-label={`Score ${detail.score} de 100`}>
+          <div className="score-ring-container category-ring" aria-label={detail.score !== null ? `Score ${detail.score} de 100` : "Sin datos de score"}>
             <svg className="score-ring-svg" viewBox="0 0 100 100">
               <circle className="score-ring-bg" cx="50" cy="50" r="42" />
               <circle
@@ -92,11 +92,11 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
                 cy="50"
                 r="42"
                 strokeDasharray="263.89"
-                strokeDashoffset={263.89 - (263.89 * detail.score) / 100}
+                strokeDashoffset={263.89 - (263.89 * (detail.score ?? 0)) / 100}
               />
             </svg>
             <div className="score-ring-text">
-              <span>{detail.score}</span>
+              <span>{detail.score !== null ? detail.score : "--"}</span>
               <small>Score</small>
             </div>
           </div>

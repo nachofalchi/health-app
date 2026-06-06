@@ -11,28 +11,28 @@ import type { DailyMetric, BodyMeasurement } from "@/lib/types";
 
 // ─── Sub-score formulas ────────────────────────────────────────────────────────
 
-export function scoreFromSteps(steps?: number | null): number {
-  if (!steps) return 45;
+export function scoreFromSteps(steps?: number | null): number | null {
+  if (steps === null || steps === undefined) return null;
   return Math.max(35, Math.min(95, Math.round((steps / 10000) * 82)));
 }
 
-export function scoreFromSleep(minutes?: number | null): number {
-  if (!minutes) return 40;
+export function scoreFromSleep(minutes?: number | null): number | null {
+  if (minutes === null || minutes === undefined) return null;
   if (minutes >= 420 && minutes <= 540) return 82;
   if (minutes >= 360) return 68;
   return 48;
 }
 
-export function scoreFromHRV(hrv?: number | null): number {
-  if (!hrv) return 45;
+export function scoreFromHRV(hrv?: number | null): number | null {
+  if (hrv === null || hrv === undefined) return null;
   if (hrv >= 60) return 88;
   if (hrv >= 40) return 72;
   if (hrv >= 25) return 58;
   return 42;
 }
 
-export function scoreFromRestingHR(hr?: number | null): number {
-  if (!hr) return 42;
+export function scoreFromRestingHR(hr?: number | null): number | null {
+  if (hr === null || hr === undefined) return null;
   if (hr <= 55) return 85;
   if (hr <= 65) return 72;
   if (hr <= 75) return 58;
@@ -40,16 +40,11 @@ export function scoreFromRestingHR(hr?: number | null): number {
 }
 
 export function calculateOverallScore(
-  activityScore: number,
-  sleepScore: number,
-  compositionScore: number,
-  cardiovascularScore: number,
-  recoveryScore: number,
-  wellbeingScore: number
-): number {
-  return Math.round(
-    (activityScore + sleepScore + compositionScore + cardiovascularScore + recoveryScore + wellbeingScore) / 6
-  );
+  scores: Array<number | null | undefined>
+): number | null {
+  const valid = scores.filter((s): s is number => typeof s === "number" && s !== null && !isNaN(s));
+  if (!valid.length) return null;
+  return Math.round(valid.reduce((sum, s) => sum + s, 0) / valid.length);
 }
 
 // ─── Main scoring + insights function ────────────────────────────────────────
@@ -114,15 +109,14 @@ export async function calculateScoresAndInsights(
 
   const activityScore = scoreFromSteps(latest.steps);
   const sleepScore = scoreFromSleep(latest.sleep_minutes);
-  const compositionScore = bodyRows?.length ? 70 : 45;
-  const cardiovascularScore = latest.resting_hr
-    ? scoreFromRestingHR(latest.resting_hr)
-    : 42;
+  const compositionScore = bodyRows?.length ? 70 : null;
+  const cardiovascularScore = scoreFromRestingHR(latest.resting_hr);
   const hrvScore = scoreFromHRV(latest.hrv);
-  const recoveryScore =
-    latest.hrv || latest.sleep_minutes
-      ? Math.round((sleepScore + hrvScore) / 2)
-      : 45;
+
+  const recoveryParts = [sleepScore, hrvScore].filter((v): v is number => v !== null);
+  const recoveryScore = recoveryParts.length > 0
+    ? Math.round(recoveryParts.reduce((a, b) => a + b, 0) / recoveryParts.length)
+    : null;
 
   // Factor in subjective wellbeing if available
   const latestManual = (manualLogs ?? [])[0];
@@ -134,16 +128,16 @@ export async function calculateScoresAndInsights(
     latestManual?.stress_score && latestManual.stress_score >= 4 ? -10 : 0;
   const wellbeingScore = subjectiveScore !== null
     ? Math.max(25, Math.min(90, subjectiveScore + stressModifier))
-    : 45;
+    : null;
 
-  const overallScore = calculateOverallScore(
+  const overallScore = calculateOverallScore([
     activityScore,
     sleepScore,
     compositionScore,
     cardiovascularScore,
     recoveryScore,
     wellbeingScore
-  );
+  ]);
 
   const { error: scoreError } = await supabase.from("scores").upsert(
     {

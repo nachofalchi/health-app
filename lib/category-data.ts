@@ -28,7 +28,7 @@ import type {
 export type CategoryDetail = {
   slug: CategorySlug;
   title: string;
-  score: number;
+  score: number | null;
   status: string;
   summary: string;
   isReal: boolean;
@@ -300,7 +300,7 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
     return {
       slug: category,
       title: "Sueno",
-      score: latestScore?.sleep_score ?? 40,
+      score: latestScore?.sleep_score ?? null,
       status: latestSleep?.sleep_minutes ? "Con datos sincronizados" : "Sin sueno reciente",
       summary: latestSleep?.sleep_minutes
         ? `Ultimo registro: ${formatMinutes(latestSleep.sleep_minutes)}. Promedio reciente: ${formatMinutes(recentSleep)}.`
@@ -364,7 +364,7 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
     return {
       slug: category,
       title: "Entrenamiento",
-      score: latestScore?.training_score ?? (latestExercise ? 70 : 45),
+      score: latestScore?.training_score ?? (latestExercise ? 70 : null),
       status: latestExercise ? "Ejercicio detectado" : "Sin ejercicio normalizado",
       summary: latestExercise
         ? `Ultima actividad: ${latestExercise.display_name ?? latestExercise.exercise_type ?? "Ejercicio"}. Pasos recientes: ${formatNumber(recentSteps)}.`
@@ -411,7 +411,7 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
     return {
       slug: category,
       title: "Composicion",
-      score: latestScore?.body_composition_score ?? (latestBody ? 70 : 45),
+      score: latestScore?.body_composition_score ?? (latestBody ? 70 : null),
       status: latestBody ? "Medicion disponible" : "Sin mediciones",
       summary: latestBody
         ? `Ultima medicion: ${formatDecimal(latestBody.weight_kg)} kg y ${formatDecimal(latestBody.body_fat_percentage)}% grasa.`
@@ -446,11 +446,13 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
 
   if (category === "cardiovascular") {
     const proj = projectCardiovascular(metrics.map(m => m.resting_hr));
+    const hasData = (latestMetric?.resting_hr !== null && latestMetric?.resting_hr !== undefined) || (latestPressure !== null && latestPressure !== undefined);
+    const scoreVal = latestScore?.cardiovascular_score ?? null;
 
     return {
       slug: category,
       title: "Cardiovascular",
-      score: latestScore?.cardiovascular_score ?? 42,
+      score: scoreVal,
       status: latestMetric?.resting_hr || latestPressure ? "Datos parciales" : "Sin FC o presion",
       summary: latestPressure
         ? `Ultima presion: ${latestPressure.systolic}/${latestPressure.diastolic}.`
@@ -462,7 +464,7 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
       metrics: [
         { label: "Presion", value: latestPressure ? `${latestPressure.systolic}/${latestPressure.diastolic}` : "sin dato" },
         { label: "Pulso", value: latestPressure?.pulse ? `${latestPressure.pulse} bpm` : "sin dato" },
-        { label: "Score", value: `${latestScore?.cardiovascular_score ?? 42}/100` }
+        { label: "Score", value: scoreVal !== null ? `${scoreVal}/100` : "--" }
       ],
       trend: trendFromMetrics(metrics.slice(0, 14), (row) => row.resting_hr, (value) => (value ? `${Math.round(value)} bpm` : "sin dato"), 100),
       recommendations: [
@@ -526,7 +528,7 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
   return {
     slug: category,
     title: "Recuperacion",
-    score: latestScore?.recovery_score ?? 45,
+    score: latestScore?.recovery_score ?? null,
     status: latestMetric?.hrv || latestMetric?.sleep_minutes ? "Datos parciales" : "Sin HRV",
     summary: latestMetric?.hrv
       ? `HRV reciente: ${formatDecimal(latestMetric.hrv)}. Sueno reciente: ${formatMinutes(latestMetric.sleep_minutes)}.`

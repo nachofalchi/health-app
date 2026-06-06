@@ -56,7 +56,7 @@ type WeeklySummaryMetric = { label: string; value: string };
 
 type DashboardTabsProps = {
   day: {
-    overall: number;
+    overall: number | null;
     status: string;
     summary: string;
     insights: DayInsight[];
@@ -273,7 +273,7 @@ export function DashboardTabs({
               key={sector.name}
               className={`sector-row theme-${slug}`}
               href={`/categorias/${slug}`}
-              aria-label={`${sector.name}: ${sector.score} puntos, ${sector.state}`}
+              aria-label={`${sector.name}: ${sector.score !== null && sector.score !== undefined ? `${sector.score} puntos` : "sin datos"}, ${sector.state}`}
             >
               <div className="sector-icon-badge">
                 <Icon size={18} aria-hidden />
@@ -283,7 +283,7 @@ export function DashboardTabs({
                 <div className="sector-row-state">{sector.state}</div>
               </div>
               <div className="sector-row-score-area">
-                <span className="sector-row-score">{sector.score}</span>
+                <span className="sector-row-score">{sector.score !== null && sector.score !== undefined ? sector.score : "--"}</span>
                 {sector.history && sector.history.length > 1 && (
                   <svg
                     width="44"

@@ -257,7 +257,7 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
     summary: latestMetricWithSteps
       ? `Ultimo dia con pasos: ${latestMetricWithSteps.date}. Pasos registrados: ${formatNumber(latestMetricWithSteps.steps)}.`
       : "Conecta Google Health y sincroniza para empezar a reemplazar los datos demo.",
-    trainingRecommendation: overall >= 75 ? "Moderado" : "Liviano",
+    trainingRecommendation: overall !== null && overall !== undefined ? (overall >= 75 ? "Moderado" : "Liviano") : "sin dato",
     insights:
       latestInsights.length > 0
         ? latestInsights.map((insight) => ({
@@ -317,13 +317,13 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
     },
     {
       name: "Cardiovascular",
-      score: latestScore?.cardiovascular_score ?? 42,
+      score: latestScore?.cardiovascular_score ?? (latestBloodPressure || latestMetric?.resting_hr ? 42 : null),
       state: latestBloodPressure
         ? `${latestBloodPressure.systolic}/${latestBloodPressure.diastolic}`
         : latestMetric?.resting_hr
           ? "con FC"
-          : "sin FC",
-      tone: "watch",
+          : "sin dato",
+      tone: latestBloodPressure || latestMetric?.resting_hr ? "watch" : "muted",
       history: getHistory("cardiovascular_score")
     },
     {

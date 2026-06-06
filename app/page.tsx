@@ -38,19 +38,23 @@ export default async function Home() {
   const dashboard = await getDashboardData(appUser);
   const { day, sectorCards, weeklySummary, experiments = [] } = dashboard;
 
-  const recoveryScore = sectorCards.find(s => s.name === "Recuperacion")?.score ?? 45;
-  const sleepScore    = sectorCards.find(s => s.name === "Sueno")?.score ?? 40;
-  const cardioScore   = sectorCards.find(s => s.name === "Cardiovascular")?.score ?? 42;
+  const recoveryScore = sectorCards.find(s => s.name === "Recuperacion")?.score ?? null;
+  const sleepScore    = sectorCards.find(s => s.name === "Sueno")?.score ?? null;
+  const cardioScore   = sectorCards.find(s => s.name === "Cardiovascular")?.score ?? null;
 
-  const tone = day.overall >= 75 ? "good" : day.overall >= 50 ? "watch" : "care";
-  const prepText = day.overall >= 75 ? "Preparación alta" : day.overall >= 50 ? "Preparación media" : "Necesita recuperación";
+  const tone = day.overall !== null && day.overall !== undefined
+    ? (day.overall >= 75 ? "good" : day.overall >= 50 ? "watch" : "care")
+    : "muted";
+  const prepText = day.overall !== null && day.overall !== undefined
+    ? (day.overall >= 75 ? "Preparación alta" : day.overall >= 50 ? "Preparación media" : "Necesita recuperación")
+    : "Sin datos de preparación";
 
   const trainingChipTone = trainingTone[day.trainingRecommendation] ?? "watch";
 
   // Ring geometry
   const R_BIG  = 54;
   const CIRC_BIG  = 2 * Math.PI * R_BIG;
-  const offset_big = CIRC_BIG - (CIRC_BIG * day.overall) / 100;
+  const offset_big = CIRC_BIG - (CIRC_BIG * (day.overall ?? 0)) / 100;
 
   const R_MINI = 25;
   const CIRC_MINI = 2 * Math.PI * R_MINI;
@@ -109,7 +113,7 @@ export default async function Home() {
             />
           </svg>
           <div className="ring-label">
-            <span className="num">{day.overall}</span>
+            <span className="num">{day.overall !== null && day.overall !== undefined ? day.overall : "--"}</span>
             <span className="unit">/ 100</span>
           </div>
         </div>
@@ -138,7 +142,7 @@ export default async function Home() {
           <h2>{prepText}</h2>
 
           <p className="score-summary" style={{ marginBottom: "12px" }}>
-            Sueño {sleepScore} · Recuperación {recoveryScore} · Cardio {cardioScore}
+            Sueño {sleepScore !== null ? sleepScore : "--"} · Recuperación {recoveryScore !== null ? recoveryScore : "--"} · Cardio {cardioScore !== null ? cardioScore : "--"}
             {day.summary ? `. ${day.summary}` : ""}
           </p>
 
@@ -157,7 +161,7 @@ export default async function Home() {
           { label: "Cardio",      score: cardioScore,   color: "var(--red)" },
         ].map(({ label, score, color }) => {
           const circ = 2 * Math.PI * R_MINI;
-          const off  = circ - (circ * score) / 100;
+          const off  = circ - (circ * (score ?? 0)) / 100;
           return (
             <div className="mini-ring-card" key={label}>
               <div className="mini-ring-wrap">
@@ -174,7 +178,7 @@ export default async function Home() {
                     style={{ filter: `drop-shadow(0 0 5px ${color}66)` }}
                   />
                 </svg>
-                <span className="mini-ring-val">{score}</span>
+                <span className="mini-ring-val">{score !== null && score !== undefined ? score : "--"}</span>
               </div>
               <span className="mini-ring-label">{label}</span>
             </div>

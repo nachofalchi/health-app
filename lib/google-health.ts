@@ -446,12 +446,20 @@ async function normalizeVitals(
 ) {
   const oxygenSaturation = asRecord(point.dailyOxygenSaturation);
   const respiratoryRate = asRecord(point.dailyRespiratoryRate);
+  const restingHeartRate = asRecord(point.dailyRestingHeartRate) || asRecord(point.restingHeartRate);
+  const hrvObj = asRecord(point.heartRateVariability) || asRecord(point.hrv);
 
   let date: string | null = null;
   if (oxygenSaturation?.date) {
     date = civilDateToIso(asRecord(oxygenSaturation.date) as any);
   } else if (respiratoryRate?.date) {
     date = civilDateToIso(asRecord(respiratoryRate.date) as any);
+  } else if (restingHeartRate?.date) {
+    date = civilDateToIso(asRecord(restingHeartRate.date) as any);
+  } else if (hrvObj?.sampleTime) {
+    const sampleTime = asRecord(hrvObj.sampleTime);
+    const physicalTime = readString(sampleTime?.physicalTime);
+    date = dateFromTimestamp(physicalTime);
   } else {
     const times = extractPointTimes(dataType, point);
     date = dateFromTimestamp(times.sampleTime ?? times.intervalStart);
@@ -473,6 +481,7 @@ async function normalizeVitals(
   if (dataType === "heart-rate-variability") {
     column = "hrv";
     value =
+      readNumber(asRecord(point.heartRateVariability)?.rootMeanSquareOfSuccessiveDifferencesMilliseconds) ??
       readNumber(asRecord(point.heartRateVariability)?.rmssdMillis) ??
       readNumber(asRecord(point.hrv)?.rmssdMillis) ??
       readNumber(point.rmssdMillis);
