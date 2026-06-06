@@ -98,7 +98,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
               <small>Score</small>
             </div>
           </div>
-          <div>
+          <div className="category-score-info">
             <p className="label">{detail.status}</p>
             <h2>{detail.primaryMetric.value}</h2>
             <p>{detail.summary}</p>
@@ -107,7 +107,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
 
         <aside className="category-metrics" aria-label="Métricas principales">
           {detail.metrics.map((metric) => (
-            <div key={metric.label}>
+            <div key={metric.label} className="category-metric-row">
               <span>{metric.label}</span>
               <strong>{metric.value}</strong>
             </div>
