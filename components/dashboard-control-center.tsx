@@ -105,16 +105,6 @@ export function DashboardControlCenter() {
               <input name="diastolic" type="number" inputMode="numeric" min="40" max="140" placeholder="80" className="control-input" />
               <span className="log-helper">Normal &lt; 80 mmHg</span>
             </label>
-            <label className="log-label">
-              Energía
-              <input name="energy_score" type="number" inputMode="numeric" min="1" max="5" placeholder="4" className="control-input" />
-              <span className="log-helper">1 (baja) a 5 (excelente)</span>
-            </label>
-            <label className="log-label">
-              Ánimo
-              <input name="mood_score" type="number" inputMode="numeric" min="1" max="5" placeholder="4" className="control-input" />
-              <span className="log-helper">1 (malo) a 5 (excelente)</span>
-            </label>
           </div>
 
           {/* Quick toggles */}

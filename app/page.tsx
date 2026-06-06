@@ -131,7 +131,6 @@ export default async function Home() {
                 <li><strong>Entrenamiento:</strong> Pasos y actividad</li>
                 <li><strong>Cardiovascular:</strong> FC en reposo</li>
                 <li><strong>Composición:</strong> Peso y grasa</li>
-                <li><strong>Bienestar:</strong> Energía, humor, estrés</li>
               </ul>
             </div>
           </div>

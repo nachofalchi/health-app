@@ -11,7 +11,7 @@ import {
   type Projection
 } from "@/lib/projections";
 
-export const categorySlugs = ["recuperacion", "sueno", "entrenamiento", "cardiovascular", "composicion", "bienestar"] as const;
+export const categorySlugs = ["recuperacion", "sueno", "entrenamiento", "cardiovascular", "composicion"] as const;
 
 export type CategorySlug = (typeof categorySlugs)[number];
 
@@ -125,8 +125,7 @@ function demoCategory(slug: CategorySlug): CategoryDetail {
     sueno: "Sueno",
     entrenamiento: "Entrenamiento",
     cardiovascular: "Cardiovascular",
-    composicion: "Composicion",
-    bienestar: "Bienestar"
+    composicion: "Composicion"
   };
 
   return {
@@ -201,7 +200,7 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
   ).then(res => { insights = (res ?? []) as InsightRow[]; });
   promises.push(insightsPromise);
 
-  if (category === "sueno" || category === "entrenamiento" || category === "cardiovascular" || category === "recuperacion" || category === "bienestar") {
+  if (category === "sueno" || category === "entrenamiento" || category === "cardiovascular" || category === "recuperacion") {
     const metricsPromise = safeQuery(
       supabase
         .from("daily_metrics")
@@ -247,18 +246,6 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
         .limit(10)
     ).then(res => { pressure = (res ?? []) as BloodPressure[]; });
     promises.push(pressurePromise);
-  }
-
-  if (category === "bienestar") {
-    const manualPromise = safeQuery(
-      supabase
-        .from("manual_daily_logs")
-        .select("date,energy_score,mood_score,caffeine_consumed,alcohol_level,heavy_meal_at_night,notes")
-        .eq("user_id", userId)
-        .order("date", { ascending: false })
-        .limit(30)
-    ).then(res => { manual = (res ?? []) as ManualLog[]; });
-    promises.push(manualPromise);
   }
 
   await Promise.all(promises);
@@ -495,138 +482,6 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
         directionColor: proj.directionColor,
         confidence: proj.confidence
       }
-    };
-  }
-
-  if (category === "bienestar") {
-    const moodAverage = average(manual.map((row) => row.mood_score));
-    const energyAverage = average(manual.map((row) => row.energy_score));
-
-    const habits: Array<{ title: string; value: string; description: string; type: "positive" | "negative" | "neutral" }> = [];
-
-    const merged = manual.map(log => {
-      const metric = metrics.find(m => m.date === log.date);
-      return { log, metric };
-    }).filter(x => x.metric !== undefined);
-
-    if (merged.length >= 3) {
-      // 1. Caffeine vs Sleep
-      const withCaf = merged.filter(x => x.log.caffeine_consumed);
-      const noCaf = merged.filter(x => !x.log.caffeine_consumed);
-      if (withCaf.length > 0 && noCaf.length > 0) {
-        const avgSleepWith = average(withCaf.map(x => x.metric?.sleep_minutes));
-        const avgSleepNo = average(noCaf.map(x => x.metric?.sleep_minutes));
-        if (avgSleepWith !== null && avgSleepNo !== null) {
-          const diff = avgSleepNo - avgSleepWith;
-          const diffAbs = Math.abs(diff);
-          if (diffAbs >= 15) {
-            habits.push({
-              title: "Cafeína vs. Sueño",
-              value: `${diff > 0 ? "-" : "+"}${Math.round(diffAbs)} min`,
-              description: diff > 0 
-                ? `Duermes un promedio de ${Math.round(diffAbs)} minutos MENOS en días que consumes cafeína.`
-                : `Duermes un promedio de ${Math.round(diffAbs)} minutos MÁS en días con cafeína.`,
-              type: diff > 0 ? "negative" : "positive"
-            });
-          }
-        }
-      }
-
-      // 2. Alcohol vs HRV
-      const withAlc = merged.filter(x => x.log.alcohol_level && x.log.alcohol_level !== "none");
-      const noAlc = merged.filter(x => !x.log.alcohol_level || x.log.alcohol_level === "none");
-      if (withAlc.length > 0 && noAlc.length > 0) {
-        const avgHrvWith = average(withAlc.map(x => x.metric?.hrv));
-        const avgHrvNo = average(noAlc.map(x => x.metric?.hrv));
-        if (avgHrvWith !== null && avgHrvNo !== null) {
-          const diff = avgHrvNo - avgHrvWith;
-          if (diff > 0) {
-            habits.push({
-              title: "Alcohol vs. HRV",
-              value: `-${Math.round(diff)} ms`,
-              description: `Tu variabilidad de frecuencia cardíaca (HRV) promedio disminuye ${Math.round(diff)} ms los días que consumes alcohol.`,
-              type: "negative"
-            });
-          }
-        }
-      }
-
-      // 3. Heavy meal at night vs Sleep
-      const withHeavyMeal = merged.filter(x => x.log.heavy_meal_at_night);
-      const noHeavyMeal = merged.filter(x => !x.log.heavy_meal_at_night);
-      if (withHeavyMeal.length > 0 && noHeavyMeal.length > 0) {
-        const avgSleepWith = average(withHeavyMeal.map(x => x.metric?.sleep_minutes));
-        const avgSleepNo = average(noHeavyMeal.map(x => x.metric?.sleep_minutes));
-        if (avgSleepWith !== null && avgSleepNo !== null) {
-          const diff = avgSleepNo - avgSleepWith;
-          if (diff > 10) {
-            habits.push({
-              title: "Cena Pesada vs. Sueño",
-              value: `-${Math.round(diff)} min`,
-              description: `Cenar pesado por la noche se asocia con perder ${Math.round(diff)} minutos de sueño total.`,
-              type: "negative"
-            });
-          }
-        }
-      }
-    }
-
-    if (habits.length === 0) {
-      habits.push({
-        title: "Aprendiendo correlaciones",
-        value: "Pendiente",
-        description: "Se necesitan registrar al menos 3 días con hábitos diferentes (ej. con y sin cafeína) para estimar el impacto.",
-        type: "neutral"
-      });
-    }
-
-    const proj = projectWellbeing(
-      manual.map(r => r.energy_score),
-      manual.map(r => r.mood_score)
-    );
-
-    return {
-      slug: category,
-      title: "Bienestar",
-      score: latestScore?.wellbeing_score ?? (latestManual ? 60 : 45),
-      status: latestManual ? "Carga manual disponible" : "Sin carga manual",
-      summary: latestManual
-        ? `Ultima carga: energia ${formatNumber(latestManual.energy_score)}, animo ${formatNumber(latestManual.mood_score)}.`
-        : "Carga energia, animo y notas para que esta categoria tenga contexto subjetivo.",
-      isReal: true,
-      primaryMetric: { label: "Energia", value: formatNumber(latestManual?.energy_score) },
-      metrics: [
-        { label: "Animo", value: formatNumber(latestManual?.mood_score) },
-        { label: "Promedio energia", value: formatNumber(energyAverage) },
-        { label: "Promedio animo", value: formatNumber(moodAverage) }
-      ],
-      trend: [...manual].reverse().map((row) => {
-        const value = row.energy_score ?? row.mood_score ?? null;
-        return {
-          label: row.date.slice(5, 10),
-          value,
-          display: formatNumber(value),
-          intensity: value === null ? 5 : Math.max(8, Math.min(100, value))
-        };
-      }),
-      recommendations: [
-        {
-          title: "Contexto humano",
-          body: "Los datos subjetivos ayudan a explicar dias donde pasos o sueno no cuentan toda la historia.",
-          confidence: manual.length >= 3 ? "media" : "baja"
-        },
-        ...genericRecommendations.slice(0, 2)
-      ],
-      projection: {
-        title: "Proyeccion bienestar",
-        value: proj.projectedDisplay,
-        body: proj.explanation,
-        direction: proj.direction,
-        directionArrow: proj.directionArrow,
-        directionColor: proj.directionColor,
-        confidence: proj.confidence
-      },
-      habitsCorrelation: habits
     };
   }
 

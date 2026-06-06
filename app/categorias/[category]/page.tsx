@@ -147,39 +147,6 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
           </div>
         )}
 
-        {detail.slug === "bienestar" && detail.habitsCorrelation && (
-          <article className="chart-panel" style={{ gridColumn: "1 / -1", padding: "24px" }}>
-            <div className="section-title">
-              <TrendingUp size={22} aria-hidden />
-              <h2>Análisis de Correlaciones de Hábitos</h2>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginTop: "16px" }}>
-              {detail.habitsCorrelation.map((h, i) => (
-                <div key={i} style={{
-                  padding: "16px",
-                  borderRadius: "var(--radius-md)",
-                  background: h.type === "positive" ? "rgba(30, 142, 62, 0.08)" : h.type === "negative" ? "rgba(217, 48, 37, 0.08)" : "var(--line-light)",
-                  border: `1px solid ${h.type === "positive" ? "rgba(30, 142, 62, 0.2)" : h.type === "negative" ? "rgba(217, 48, 37, 0.2)" : "var(--line)"}`,
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                    <h3 style={{ fontSize: "1.05rem", fontWeight: 700, margin: 0, color: "var(--ink)" }}>{h.title}</h3>
-                    <span style={{
-                      fontSize: "0.85rem",
-                      fontWeight: 800,
-                      color: h.type === "positive" ? "var(--green)" : h.type === "negative" ? "var(--red)" : "var(--muted)",
-                      background: "var(--panel)",
-                      padding: "2px 8px",
-                      borderRadius: "12px",
-                      border: "1px solid var(--line)"
-                    }}>{h.value}</span>
-                  </div>
-                  <p style={{ margin: 0, fontSize: "0.88rem", color: "var(--muted)", lineHeight: 1.4 }}>{h.description}</p>
-                </div>
-              ))}
-            </div>
-          </article>
-        )}
-
         {detail.slug === "entrenamiento" && detail.exercises && detail.exercises.length > 0 && (
           <article className="chart-panel" style={{ gridColumn: "1 / -1", padding: "24px" }}>
             <div className="section-title">

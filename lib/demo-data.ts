@@ -31,8 +31,7 @@ export const sectorCards = [
   { name: "Sueño", score: 78, state: "bueno", tone: "good", history: [70, 72, 75, 68, 74, 80, 78] },
   { name: "Entrenamiento", score: 70, state: "estable", tone: "good", history: [65, 68, 70, 72, 68, 69, 70] },
   { name: "Cardiovascular", score: 82, state: "bien", tone: "good", history: [80, 81, 80, 83, 82, 81, 82] },
-  { name: "Composición", score: 68, state: "estable", tone: "watch", history: [68, 68, 68, 68, 68, 68, 68] },
-  { name: "Bienestar", score: 75, state: "bien", tone: "good", history: [70, 72, 73, 75, 74, 76, 75] }
+  { name: "Composición", score: 68, state: "estable", tone: "watch", history: [68, 68, 68, 68, 68, 68, 68] }
 ];
 
 export const weeklySummary = [

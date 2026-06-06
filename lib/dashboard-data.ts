@@ -332,13 +332,6 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
       state: latestBody ? "actualizada" : "sin dato",
       tone: latestBody ? "good" : "watch",
       history: getHistory("body_composition_score")
-    },
-    {
-      name: "Bienestar",
-      score: latestScore?.wellbeing_score ?? (latestManual ? 60 : 45),
-      state: latestManual ? "cargado" : "sin carga",
-      tone: latestManual ? "good" : "watch",
-      history: getHistory("wellbeing_score")
     }
   ];
 
