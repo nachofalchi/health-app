@@ -97,7 +97,11 @@ export type ScoreRow = {
   body_composition_score: number | null;
   wellbeing_score: number | null;
   overall_score: number | null;
-  calculation_version?: string;
+  calculation_version?: string | null;
+  explanation_json?: any | null;
+  health_index?: number | null;
+  daily_readiness?: number | null;
+  body_progress?: number | null;
 };
 
 export type InsightRow = {

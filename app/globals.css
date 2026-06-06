@@ -2169,3 +2169,106 @@ label:has(input[name="heavy_meal_at_night"]:checked) .heavymeal-chip {
 .logs-table tr:last-child td {
   border-bottom: 0;
 }
+
+/* ==========================================
+   Advanced Scoring Engine Styling
+   ========================================== */
+.pillars-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pillar-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.pillar-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.pillar-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line-light);
+  padding-bottom: 8px;
+}
+
+.pillar-header-row h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+.pillar-content-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pillar-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.pillar-algo {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.pillar-desc-text {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--ink-2);
+  margin: 0;
+}
+
+/* Confidence Tags */
+.conf-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.conf-tag.conf-alta {
+  background: rgba(48, 209, 88, 0.15);
+  color: var(--green);
+}
+
+.conf-tag.conf-media {
+  background: rgba(255, 149, 0, 0.15);
+  color: var(--amber);
+}
+
+.conf-tag.conf-baja {
+  background: rgba(255, 59, 48, 0.15);
+  color: var(--red);
+}
+
+.conf-tag.conf-insuficiente {
+  background: rgba(142, 142, 147, 0.15);
+  color: var(--muted);
+}
+
+/* Dark mode overrides for pillars */
+[data-theme="dark"] .pillar-card {
+  border: 1px solid var(--line);
+}
+

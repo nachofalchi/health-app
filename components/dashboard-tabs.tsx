@@ -81,6 +81,7 @@ type DashboardTabsProps = {
     activity_level: string | null;
   } | null;
   isGoogleHealthConnected: boolean;
+  advancedScores?: any;
 };
 
 // ─── Icon Map ────────────────────────────────────────────────────────────────
@@ -137,9 +138,11 @@ export function DashboardTabs({
   syncSummary,
   profile,
   isGoogleHealthConnected,
+  advancedScores,
 }: DashboardTabsProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabId>("summary");
+  const [expandedPillar, setExpandedPillar] = useState<string | null>(null);
 
   // Profile form
   const [height, setHeight] = useState(
@@ -308,6 +311,112 @@ export function DashboardTabs({
           );
         })}
       </section>
+
+      {/* Detalle de Puntuaciones Avanzadas (Accordion) */}
+      {advancedScores && (
+        <section className="advanced-scores-breakdown" aria-label="Desglose de cálculo de scores" style={{
+          background: "var(--panel)",
+          borderRadius: "var(--radius-lg)",
+          border: "1px solid var(--line)",
+          padding: "16px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "12px"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid var(--line)", paddingBottom: "10px" }}>
+            <Brain size={18} style={{ color: "var(--accent)" }} />
+            <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: 0, color: "var(--ink)" }}>¿Cómo se calculó mi score?</h2>
+          </div>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {[
+              { id: "readiness", title: "Disponibilidad Diaria", data: advancedScores.dailyReadiness },
+              { id: "health", title: "Índice de Salud", data: advancedScores.healthIndex },
+              { id: "body", title: "Progreso Corporal", data: advancedScores.bodyProgress }
+            ].map(({ id, title, data }) => {
+              if (!data) return null;
+              const isExpanded = expandedPillar === id;
+              
+              const algoLabel = data.algorithmUsed === "baseline_personalizado" 
+                ? "Baseline" 
+                : "Por reglas";
+                
+              return (
+                <div key={id} style={{ border: "1px solid var(--line)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedPillar(isExpanded ? null : id)}
+                    style={{
+                      width: "100%",
+                      padding: "12px 16px",
+                      background: "var(--panel-2)",
+                      border: "none",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      cursor: "pointer",
+                      textAlign: "left"
+                    }}
+                  >
+                    <div>
+                      <strong style={{ fontSize: "0.85rem", color: "var(--ink)" }}>{title}</strong>
+                      <span style={{ marginLeft: "8px", fontSize: "0.8rem", color: "var(--muted)" }}>
+                        ({data.score ?? "--"}/100)
+                      </span>
+                    </div>
+                    <span style={{ fontSize: "0.8rem", color: "var(--accent)" }}>
+                      {isExpanded ? "Ocultar" : "Mostrar detalles"}
+                    </span>
+                  </button>
+                  
+                  {isExpanded && (
+                    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: "10px", background: "var(--panel)" }}>
+                      <p style={{ fontSize: "0.8rem", margin: 0, color: "var(--ink-2)", lineHeight: 1.4 }}>{data.explanation}</p>
+                      
+                      <div style={{ fontSize: "0.75rem", display: "flex", gap: "12px", borderBottom: "1px solid var(--line)", paddingBottom: "6px", color: "var(--muted)" }}>
+                        <span>Algoritmo: <strong>{algoLabel}</strong></span>
+                        <span>Confianza: <strong>{data.confidence}</strong></span>
+                      </div>
+                      
+                      {data.components && data.components.length > 0 && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--ink)" }}>Métricas Utilizadas:</span>
+                          <div style={{ overflowX: "auto" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.72rem" }}>
+                              <thead>
+                                <tr style={{ borderBottom: "1px solid var(--line)", color: "var(--muted)" }}>
+                                  <th style={{ textAlign: "left", padding: "4px 0" }}>Componente</th>
+                                  <th style={{ textAlign: "right", padding: "4px 0" }}>Valor</th>
+                                  <th style={{ textAlign: "right", padding: "4px 0" }}>Baseline/Ref</th>
+                                  <th style={{ textAlign: "right", padding: "4px 0" }}>Peso</th>
+                                  <th style={{ textAlign: "right", padding: "4px 0" }}>Puntaje</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {data.components.map((comp: any, idx: number) => (
+                                  <tr key={idx} style={{ borderBottom: "1px solid var(--line-light)" }}>
+                                    <td style={{ padding: "6px 0", color: "var(--ink)", fontWeight: 600 }}>{comp.name}</td>
+                                    <td style={{ padding: "6px 0", textAlign: "right", color: "var(--ink-2)" }}>{comp.value !== undefined && comp.value !== null ? comp.value : "—"}</td>
+                                    <td style={{ padding: "6px 0", textAlign: "right", color: "var(--muted)" }}>{comp.baseline !== undefined && comp.baseline !== null ? comp.baseline : "—"}</td>
+                                    <td style={{ padding: "6px 0", textAlign: "right", color: "var(--muted)" }}>{(comp.weight * 100).toFixed(0)}%</td>
+                                    <td style={{ padding: "6px 0", textAlign: "right", color: comp.score !== null ? "var(--ink)" : "var(--muted)", fontWeight: comp.score !== null ? "bold" : "normal" }}>
+                                      {comp.score !== null ? comp.score : "—"}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Insights */}
       <section className="insights-panel" aria-label="Insights de hoy">

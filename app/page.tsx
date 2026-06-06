@@ -4,6 +4,7 @@ import { DashboardTabs } from "@/components/dashboard-tabs";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { getAppUserContext } from "@/lib/app-user";
 import { LandingAuthPage } from "@/components/landing-auth-page";
+import type { ScoreResult } from "@/lib/scoring";
 
 const trainingTone: Record<string, string> = {
   Fuerte: "good",
@@ -28,6 +29,71 @@ function formatDate() {
   });
 }
 
+function PillarCard({
+  title,
+  pillar,
+  colorClass,
+  svgColor
+}: {
+  title: string;
+  pillar: ScoreResult;
+  colorClass: string;
+  svgColor: string;
+}) {
+  const R_MINI = 22;
+  const CIRC_MINI = 2 * Math.PI * R_MINI;
+  const score = pillar.score;
+  const off = CIRC_MINI - (CIRC_MINI * (score ?? 0)) / 100;
+  
+  const algoLabel = pillar.algorithmUsed === "baseline_personalizado" 
+    ? "Baseline" 
+    : "Por reglas";
+  
+  const confLabels: Record<string, string> = {
+    alta: "Confianza Alta",
+    media: "Confianza Media",
+    baja: "Confianza Baja",
+    insuficiente: "Sin datos suf."
+  };
+
+  return (
+    <div className={`pillar-card theme-${colorClass}`}>
+      <div className="pillar-header-row">
+        <h3>{title}</h3>
+        <span className={`conf-tag conf-${pillar.confidence}`}>
+          {confLabels[pillar.confidence] || pillar.confidence}
+        </span>
+      </div>
+      
+      <div className="pillar-content-row">
+        <div className="mini-ring-wrap" style={{ position: "relative", width: "50px", height: "50px" }}>
+          <svg viewBox="0 0 50 50" aria-hidden style={{ width: "100%", height: "100%" }}>
+            <circle className="mini-ring-track" cx="25" cy="25" r={R_MINI} style={{ stroke: "var(--line)" }} />
+            <circle
+              className="mini-ring-fill"
+              cx="25"
+              cy="25"
+              r={R_MINI}
+              strokeDasharray={CIRC_MINI}
+              strokeDashoffset={off}
+              stroke={svgColor}
+              style={{ filter: `drop-shadow(0 0 3px ${svgColor}66)`, transform: "rotate(-90deg)", transformOrigin: "50% 50%" }}
+            />
+          </svg>
+          <span className="mini-ring-val" style={{ fontSize: "0.85rem", fontWeight: 700 }}>
+            {score !== null && score !== undefined ? score : "--"}
+          </span>
+        </div>
+
+        <div className="pillar-details">
+          <span className="pillar-algo">Modo: {algoLabel}</span>
+          <p className="pillar-desc-text">{pillar.explanation}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default async function Home() {
   const appUser = await getAppUserContext();
 
@@ -36,28 +102,42 @@ export default async function Home() {
   }
 
   const dashboard = await getDashboardData(appUser);
-  const { day, sectorCards, weeklySummary, experiments = [] } = dashboard;
+  const { day, sectorCards, weeklySummary, experiments = [], advancedScores } = dashboard;
 
   const recoveryScore = sectorCards.find(s => s.name === "Recuperacion")?.score ?? null;
   const sleepScore    = sectorCards.find(s => s.name === "Sueno")?.score ?? null;
   const cardioScore   = sectorCards.find(s => s.name === "Cardiovascular")?.score ?? null;
 
-  const tone = day.overall !== null && day.overall !== undefined
-    ? (day.overall >= 75 ? "good" : day.overall >= 50 ? "watch" : "care")
+  const generalScoreObj = advancedScores?.generalScore || { score: day.overall, confidence: "media", explanation: "" };
+  const generalScore = generalScoreObj.score;
+  const generalConf = generalScoreObj.confidence;
+  const generalExpl = generalScoreObj.explanation;
+
+  const tone = generalScore !== null && generalScore !== undefined
+    ? (generalScore >= 75 ? "good" : generalScore >= 50 ? "watch" : "care")
     : "muted";
-  const prepText = day.overall !== null && day.overall !== undefined
-    ? (day.overall >= 75 ? "Preparación alta" : day.overall >= 50 ? "Preparación media" : "Necesita recuperación")
+    
+  const prepText = generalScore !== null && generalScore !== undefined
+    ? (generalScore >= 75 ? "Preparación alta" : generalScore >= 50 ? "Preparación media" : "Necesita recuperación")
     : "Sin datos de preparación";
 
   const trainingChipTone = trainingTone[day.trainingRecommendation] ?? "watch";
 
-  // Ring geometry
-  const R_BIG  = 54;
-  const CIRC_BIG  = 2 * Math.PI * R_BIG;
-  const offset_big = CIRC_BIG - (CIRC_BIG * (day.overall ?? 0)) / 100;
-
-  const R_MINI = 25;
-  const CIRC_MINI = 2 * Math.PI * R_MINI;
+  // Combine standard anomalies with Advanced Scoring engine alerts
+  const allAlerts = [
+    ...(advancedScores?.alerts || []).map((alert) => ({
+      title: alert.title,
+      body: alert.message,
+      severity: alert.severity === "critical" ? "danger" as const : (alert.severity === "warning" ? "warning" as const : "info" as const),
+      category: alert.category
+    })),
+    ...(dashboard.anomalies || []).map((anomaly) => ({
+      title: anomaly.title,
+      body: anomaly.body,
+      severity: anomaly.severity,
+      category: "anomaly"
+    }))
+  ];
 
   return (
     <main className="shell">
@@ -78,113 +158,99 @@ export default async function Home() {
         </div>
       </header>
 
-      {/* ─── Anomaly Banners ──────────────────────────────────────── */}
-      {dashboard.anomalies && dashboard.anomalies.length > 0 && (
-        <section aria-label="Alertas de salud">
-          {dashboard.anomalies.map((anomaly, i) => (
-            <div
-              key={i}
-              className={`anomaly-banner ${anomaly.severity === "danger" ? "danger" : "warning"}`}
-            >
-              <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>
-                {anomaly.severity === "danger" ? "🔴" : "🟡"}
-              </span>
-              <div>
-                <strong>{anomaly.title}</strong>
-                <p>{anomaly.body}</p>
+      {/* ─── Alertas / Red Flags (Clinical Alerts) ────────────────── */}
+      {allAlerts.length > 0 && (
+        <section aria-label="Alertas y Notificaciones de Salud" style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
+          {allAlerts.map((alert, i) => {
+            const isDanger = alert.severity === "danger";
+            const isWarning = alert.severity === "warning";
+            const emoji = isDanger ? "🔴" : (isWarning ? "🟡" : "ℹ️");
+            return (
+              <div
+                key={i}
+                className={`anomaly-banner ${alert.severity}`}
+              >
+                <span style={{ fontSize: "1.2rem", lineHeight: 1, marginRight: "4px" }}>
+                  {emoji}
+                </span>
+                <div>
+                  <strong>{alert.title}</strong>
+                  <p>{alert.body}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </section>
       )}
 
-      {/* ─── Score Hero ───────────────────────────────────────────── */}
-      <section className="score-hero" aria-label="Score diario general">
-        <div className="score-hero-ring">
-          <svg viewBox="0 0 120 120" aria-hidden>
-            <circle className="ring-track" cx="60" cy="60" r={R_BIG} />
-            <circle
-              className={`ring-fill tone-${tone}`}
-              cx="60"
-              cy="60"
-              r={R_BIG}
-              strokeDasharray={CIRC_BIG}
-              strokeDashoffset={offset_big}
+      {/* ─── Advanced Scores: Pillars ────────────────────────────── */}
+      <section className="pillars-section" aria-label="Pilares de Salud y Rendimiento" style={{ marginBottom: "24px" }}>
+        <h2 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "12px", color: "var(--ink)" }}>Puntuación del Día</h2>
+        
+        {advancedScores ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <PillarCard 
+              title="Disponibilidad Diaria" 
+              pillar={advancedScores.dailyReadiness} 
+              colorClass="readiness" 
+              svgColor="var(--green)"
             />
-          </svg>
-          <div className="ring-label">
-            <span className="num">{day.overall !== null && day.overall !== undefined ? day.overall : "--"}</span>
-            <span className="unit">/ 100</span>
+            <PillarCard 
+              title="Índice de Salud General" 
+              pillar={advancedScores.healthIndex} 
+              colorClass="health-index" 
+              svgColor="var(--accent)"
+            />
+            <PillarCard 
+              title="Progreso Corporal" 
+              pillar={advancedScores.bodyProgress} 
+              colorClass="body-progress" 
+              svgColor="var(--purple)"
+            />
+          </div>
+        ) : (
+          <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>Cargando puntuaciones avanzadas...</p>
+        )}
+      </section>
+
+      {/* ─── Combined General Score Row ───────────────────────────── */}
+      <section className="score-hero" aria-label="Score diario general" style={{ padding: "16px", borderRadius: "var(--radius-lg)", background: "var(--panel)", border: "1px solid var(--line)", marginBottom: "24px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+          <div>
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)" }}>
+              Puntuación General Integrada
+            </span>
+            <h2 style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--ink)", marginTop: "4px" }}>{prepText}</h2>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+            <div className="ring-label" style={{ display: "inline-flex", alignItems: "baseline", gap: "2px" }}>
+              <span className="num" style={{ fontSize: "1.8rem", fontWeight: 900, color: `var(--${tone === 'good' ? 'green' : (tone === 'watch' ? 'amber' : 'red')})` }}>
+                {generalScore !== null && generalScore !== undefined ? generalScore : "--"}
+              </span>
+              <span className="unit" style={{ fontSize: "0.8rem", color: "var(--muted)" }}>/100</span>
+            </div>
+            <span className={`conf-tag conf-${generalConf}`} style={{ fontSize: "0.65rem", padding: "2px 6px" }}>
+              Confianza {generalConf}
+            </span>
           </div>
         </div>
 
-        <div className="score-hero-info">
-          <div
-            className="score-tooltip-trigger score-eyebrow"
-            style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "4px" }}
-          >
-            <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)" }}>
-              HOY · {day.overall}/100
-            </span>
-            <Info size={12} style={{ color: "var(--muted)", flexShrink: 0 }} />
-            <div className="score-tooltip-card">
-              <h3>Cálculo del Score</h3>
-              <ul>
-                <li><strong>Recuperación:</strong> Sueño + HRV</li>
-                <li><strong>Sueño:</strong> Duración y etapas</li>
-                <li><strong>Entrenamiento:</strong> Pasos y actividad</li>
-                <li><strong>Cardiovascular:</strong> FC en reposo</li>
-                <li><strong>Composición:</strong> Peso y grasa</li>
-              </ul>
-            </div>
-          </div>
-
-          <h2>{prepText}</h2>
-
-          <p className="score-summary" style={{ marginBottom: "12px" }}>
-            Sueño {sleepScore !== null ? sleepScore : "--"} · Recuperación {recoveryScore !== null ? recoveryScore : "--"} · Cardio {cardioScore !== null ? cardioScore : "--"}
-            {day.summary ? `. ${day.summary}` : ""}
+        {generalExpl && (
+          <p style={{ fontSize: "0.82rem", color: "var(--ink-2)", lineHeight: 1.4, margin: "8px 0 12px 0" }}>
+            {generalExpl}
           </p>
+        )}
 
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--line)", paddingTop: "12px", marginTop: "8px" }}>
+          <span style={{ fontSize: "0.78rem", color: "var(--muted)" }}>
+            Actividad de hoy
+          </span>
           <div className={`training-chip ${trainingChipTone}`}>
             <Dumbbell size={13} aria-hidden />
             {day.trainingRecommendation}
           </div>
         </div>
       </section>
-
-      {/* ─── Mini Rings Row ───────────────────────────────────────── */}
-      <div className="mini-rings-row" aria-label="Métricas clave">
-        {[
-          { label: "Sueño",       score: sleepScore,    color: "var(--purple)" },
-          { label: "Récup.",      score: recoveryScore, color: "var(--green)" },
-          { label: "Cardio",      score: cardioScore,   color: "var(--red)" },
-        ].map(({ label, score, color }) => {
-          const circ = 2 * Math.PI * R_MINI;
-          const off  = circ - (circ * (score ?? 0)) / 100;
-          return (
-            <div className="mini-ring-card" key={label}>
-              <div className="mini-ring-wrap">
-                <svg viewBox="0 0 60 60" aria-hidden>
-                  <circle className="mini-ring-track" cx="30" cy="30" r={R_MINI} />
-                  <circle
-                    className="mini-ring-fill"
-                    cx="30"
-                    cy="30"
-                    r={R_MINI}
-                    strokeDasharray={circ}
-                    strokeDashoffset={off}
-                    stroke={color}
-                    style={{ filter: `drop-shadow(0 0 5px ${color}66)` }}
-                  />
-                </svg>
-                <span className="mini-ring-val">{score !== null && score !== undefined ? score : "--"}</span>
-              </div>
-              <span className="mini-ring-label">{label}</span>
-            </div>
-          );
-        })}
-      </div>
 
       {/* ─── Dashboard Tabs (sectores, insights, form, config, perfil) ─── */}
       <DashboardTabs
@@ -198,7 +264,9 @@ export default async function Home() {
         syncSummary={dashboard.syncSummary}
         profile={dashboard.profile}
         isGoogleHealthConnected={dashboard.isGoogleHealthConnected}
+        advancedScores={advancedScores}
       />
     </main>
   );
 }
+

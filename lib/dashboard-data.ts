@@ -11,7 +11,7 @@ import type {
   ScoreRow,
   InsightRow
 } from "@/lib/types";
-import { scoreFromSteps } from "@/lib/scoring";
+import { scoreFromSteps, calculateAdvancedScores, type HealthScores } from "@/lib/scoring";
 
 function formatNumber(value: number | null | undefined) {
   if (value === null || value === undefined || Number.isNaN(value)) return "sin dato";
@@ -122,10 +122,10 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
       safeQuery(
         supabase
           .from("body_measurements")
-          .select("measured_at,weight_kg,body_fat_percentage,source_platform")
+          .select("*")
           .eq("user_id", userId)
           .order("measured_at", { ascending: false })
-          .limit(8)
+          .limit(50)
       ),
       safeQuery(
         supabase
@@ -138,18 +138,18 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
       safeQuery(
         supabase
           .from("manual_daily_logs")
-          .select("date,energy_score,mood_score,caffeine_consumed,notes")
+          .select("*")
           .eq("user_id", userId)
           .order("date", { ascending: false })
-          .limit(1)
+          .limit(28)
       ),
       safeQuery(
         supabase
           .from("blood_pressure_measurements")
-          .select("measured_at,systolic,diastolic,pulse")
+          .select("*")
           .eq("user_id", userId)
           .order("measured_at", { ascending: false })
-          .limit(1)
+          .limit(30)
       ),
       safeQuery(
         supabase
@@ -162,10 +162,10 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
       safeQuery(
         supabase
           .from("scores")
-          .select("date,recovery_score,sleep_score,training_score,cardiovascular_score,body_composition_score,wellbeing_score,overall_score")
+          .select("*")
           .eq("user_id", userId)
           .order("date", { ascending: false })
-          .limit(7)
+          .limit(28)
       ),
       safeQuery(
         supabase
@@ -213,9 +213,19 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
   const latestBloodPressure = ((bloodPressure ?? []) as BloodPressure[])[0] ?? null;
   const latestSync = ((syncRuns ?? []) as SyncRun[])[0] ?? null;
   const latestScore = ((scores ?? []) as ScoreRow[])[0] ?? null;
+  const advancedScores = (latestScore?.calculation_version === "v2" && latestScore?.explanation_json)
+    ? latestScore.explanation_json as HealthScores
+    : calculateAdvancedScores({
+        dailyMetrics,
+        bodyMeasurements: bodyRows ?? [],
+        bloodPressureMeasurements: bloodPressure ?? [],
+        manualLogs: manualLogs ?? [],
+        profileHeight: profileRow?.height_cm ? Number(profileRow.height_cm) : null,
+        targetDate: latestMetric?.date
+      });
   const latestInsights = uniqueInsights((dbInsights ?? []) as InsightRow[]);
   const weeklySteps = average(dailyMetrics.slice(0, 7).map((row) => row.steps));
-  const overall = latestScore?.overall_score ?? scoreFromSteps(latestMetricWithSteps?.steps);
+  const overall = advancedScores.generalScore.score;
   const bodyLabel = latestBody
     ? [
         latestBody.weight_kg !== null ? formatKg(latestBody.weight_kg) : null,
@@ -481,6 +491,7 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
       : null,
     anomalies: anomaliesList.length ? anomaliesList : null,
     experiments: calculatedExperiments,
+    advancedScores,
     profile: profileRow ? {
       height_cm: Number(profileRow.height_cm) || null,
       target_weight_kg: Number(profileRow.target_weight_kg) || null,
