@@ -117,6 +117,35 @@ function generateSparklinePath(points: number[], width = 44, height = 18): strin
     .join(" ");
 }
 
+function getConfidenceJustification(id: string, confidence: string, algorithmUsed: string, components: any[] = []) {
+  const missingCount = components.filter(c => c.score === null).length;
+  const totalCount = components.length;
+
+  if (confidence === "alta") {
+    if (id === "body") {
+      return "Tienes un peso objetivo configurado y múltiples mediciones de composición registradas recientemente.";
+    }
+    return "Se detectaron más de 14 días de historial. El cálculo se realiza comparando tus valores de hoy contra tu baseline estadístico personalizado.";
+  }
+  
+  if (confidence === "media") {
+    if (id === "body") {
+      return "Cálculo basado en tu registro de peso y composición corporal más reciente, pero sin historial de peso a largo plazo o peso objetivo configurado.";
+    }
+    return `Cálculo por reglas generales debido a que tienes menos de 14 días de historial. Se registraron la mayoría de las métricas clave (${totalCount - missingCount} de ${totalCount} disponibles).`;
+  }
+  
+  if (confidence === "baja") {
+    return `Se calcula con reglas generales y con precisión reducida porque hoy faltan varias métricas importantes (${missingCount} de ${totalCount} sin datos).`;
+  }
+  
+  if (confidence === "insuficiente") {
+    return "Faltan métricas críticas esenciales para estimar este pilar de forma representativa.";
+  }
+  
+  return "Datos de confianza no disponibles.";
+}
+
 // ─── Toast ────────────────────────────────────────────────────────────────────
 type ToastType = "success" | "error" | "info" | "warning";
 interface Toast { id: number; message: string; type: ToastType; icon: string }
@@ -376,6 +405,10 @@ export function DashboardTabs({
                       <div style={{ fontSize: "0.75rem", display: "flex", gap: "12px", borderBottom: "1px solid var(--line)", paddingBottom: "6px", color: "var(--muted)" }}>
                         <span>Algoritmo: <strong>{algoLabel}</strong></span>
                         <span>Confianza: <strong>{data.confidence}</strong></span>
+                      </div>
+
+                      <div style={{ fontSize: "0.78rem", color: "var(--ink-2)", background: "var(--panel-2)", padding: "8px 12px", borderRadius: "var(--radius-sm)", borderLeft: "3px solid var(--accent)", margin: "2px 0 6px 0", lineHeight: 1.4 }}>
+                        <strong>Justificación de Confianza:</strong> {getConfidenceJustification(id, data.confidence, data.algorithmUsed, data.components)}
                       </div>
                       
                       {data.components && data.components.length > 0 && (
