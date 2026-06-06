@@ -187,6 +187,7 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
   let manual: ManualLog[] = [];
   let pressure: BloodPressure[] = [];
   let insights: InsightRow[] = [];
+  let profile: any = null;
 
   const promises: Promise<any>[] = [];
 
@@ -244,6 +245,15 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
         .limit(30)
     ).then(res => { body = (res ?? []) as BodyMeasurement[]; });
     promises.push(bodyPromise);
+
+    const profilePromise = safeQuery(
+      supabase
+        .from("profiles")
+        .select("height_cm, target_weight_kg")
+        .eq("id", userId)
+        .maybeSingle()
+    ).then(res => { profile = res; });
+    promises.push(profilePromise);
   }
 
   if (category === "cardiovascular") {
@@ -454,8 +464,9 @@ export async function getCategoryDetail(slug?: string): Promise<CategoryDetail |
       primaryMetric: { label: "Peso", value: latestBody?.weight_kg ? `${formatDecimal(latestBody.weight_kg)} kg` : "sin dato" },
       metrics: [
         { label: "Grasa corporal", value: latestBody?.body_fat_percentage ? `${formatDecimal(latestBody.body_fat_percentage)}%` : "sin dato" },
-        { label: "Mediciones", value: `${body.length}` },
-        { label: "Score", value: `${latestScore?.body_composition_score ?? (latestBody ? 70 : 45)}/100` }
+        { label: "Altura", value: profile?.height_cm ? `${profile.height_cm} cm` : "sin dato" },
+        { label: "Peso objetivo", value: profile?.target_weight_kg ? `${profile.target_weight_kg} kg` : "sin dato" },
+        { label: "Mediciones", value: `${body.length}` }
       ],
       trend: bodyTrend,
       recommendations: [
