@@ -45,6 +45,9 @@ function PillarCard({
   const score = pillar.score;
   const off = CIRC_MINI - (CIRC_MINI * (score ?? 0)) / 100;
   
+  const hasOverride = pillar.explanation.toLowerCase().includes("override");
+  const activeSvgColor = hasOverride ? "var(--amber)" : svgColor;
+  
   const algoLabel = pillar.algorithmUsed === "baseline_personalizado" 
     ? "Baseline" 
     : "Por reglas";
@@ -57,7 +60,7 @@ function PillarCard({
   };
 
   return (
-    <div className={`pillar-card theme-${colorClass}`}>
+    <div className={`pillar-card theme-${colorClass}${hasOverride ? " warning-state" : ""}`}>
       <div className="pillar-header-row">
         <h3>{title}</h3>
         <span className={`conf-tag conf-${pillar.confidence}`}>
@@ -76,8 +79,8 @@ function PillarCard({
               r={R_MINI}
               strokeDasharray={CIRC_MINI}
               strokeDashoffset={off}
-              stroke={svgColor}
-              style={{ filter: `drop-shadow(0 0 3px ${svgColor}66)`, transform: "rotate(-90deg)", transformOrigin: "50% 50%" }}
+              stroke={activeSvgColor}
+              style={{ filter: `drop-shadow(0 0 3px ${activeSvgColor}66)`, transform: "rotate(-90deg)", transformOrigin: "50% 50%" }}
             />
           </svg>
           <span className="mini-ring-val" style={{ fontSize: "0.85rem", fontWeight: 700 }}>
@@ -185,24 +188,24 @@ export default async function Home() {
 
       {/* ─── Advanced Scores: Pillars ────────────────────────────── */}
       <section className="pillars-section" aria-label="Pilares de Salud y Rendimiento" style={{ marginBottom: "24px" }}>
-        <h2 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "12px", color: "var(--ink)" }}>Puntuación del Día</h2>
+        <h2 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "12px", color: "var(--ink)" }}>Puntuación del día</h2>
         
         {advancedScores ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <PillarCard 
-              title="Disponibilidad Diaria" 
+              title="Disponibilidad diaria" 
               pillar={advancedScores.dailyReadiness} 
               colorClass="readiness" 
               svgColor="var(--green)"
             />
             <PillarCard 
-              title="Índice de Salud General" 
+              title="Índice de salud general" 
               pillar={advancedScores.healthIndex} 
               colorClass="health-index" 
               svgColor="var(--accent)"
             />
             <PillarCard 
-              title="Progreso Corporal" 
+              title="Progreso corporal" 
               pillar={advancedScores.bodyProgress} 
               colorClass="body-progress" 
               svgColor="var(--purple)"

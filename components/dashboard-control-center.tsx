@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
@@ -37,6 +37,7 @@ export function DashboardControlCenter() {
   const router = useRouter();
   const [activeSubTab, setActiveSubTab] = useState<"cardio" | "medidas" | "habitos">("cardio");
   const [isSaving, setIsSaving] = useState(false);
+  const submittingRef = useRef(false);
   const { toasts, show: showToast } = useToast();
 
   const [useThreeReadings, setUseThreeReadings] = useState(false);
@@ -92,6 +93,8 @@ export function DashboardControlCenter() {
 
   async function handleLogSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsSaving(true);
     try {
       const res = await fetch("/api/manual-log", {
@@ -99,8 +102,15 @@ export function DashboardControlCenter() {
         body: new FormData(e.currentTarget),
       });
       if (!res.ok) {
-        const p = await res.json().catch(() => null);
-        showToast(p?.message ?? "No se pudo guardar.", "error");
+        let errMsg = `Error del servidor (código ${res.status})`;
+        try {
+          const p = await res.json();
+          if (p?.message) errMsg = p.message;
+        } catch {
+          // Response is not JSON
+        }
+        console.error("Server error saving manual log:", errMsg);
+        showToast(errMsg, "error");
         return;
       }
       e.currentTarget.reset();
@@ -109,10 +119,13 @@ export function DashboardControlCenter() {
       setReading3({ sys: "", dia: "", pulse: "" });
       showToast("Registro guardado ✓", "success");
       router.refresh();
-    } catch {
-      showToast("Error de conexión.", "error");
+    } catch (err) {
+      console.error("Error al guardar el registro manual:", err);
+      const detail = err instanceof Error ? err.message : String(err);
+      showToast(`Error de conexión: ${detail}`, "error");
     } finally {
       setIsSaving(false);
+      submittingRef.current = false;
     }
   }
 

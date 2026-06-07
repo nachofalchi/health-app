@@ -109,95 +109,133 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
 
   const { supabase, userId } = appUser;
 
-  const [metrics, bodyMeasurements, exercises, manualLogs, bloodPressure, syncRuns, scores, dbInsights, dbExperiments, rawProfileRow, oauthRow] =
-    await Promise.all([
-      safeQuery(
-        supabase
-          .from("daily_metrics")
-          .select("date,steps,distance_meters,calories_kcal,active_minutes,sleep_minutes,resting_hr,hrv,spo2,respiratory_rate")
-          .eq("user_id", userId)
-          .order("date", { ascending: false })
-          .limit(30)
-      ),
-      safeQuery(
-        supabase
-          .from("body_measurements")
-          .select("*")
-          .eq("user_id", userId)
-          .order("measured_at", { ascending: false })
-          .limit(50)
-      ),
-      safeQuery(
-        supabase
-          .from("exercises")
-          .select("start_time,end_time,display_name,exercise_type,active_duration_seconds,steps,distance_meters,calories_kcal,average_heart_rate,source_platform")
-          .eq("user_id", userId)
-          .order("start_time", { ascending: false })
-          .limit(1)
-      ),
-      safeQuery(
-        supabase
-          .from("manual_daily_logs")
-          .select("*")
-          .eq("user_id", userId)
-          .order("date", { ascending: false })
-          .limit(28)
-      ),
-      safeQuery(
-        supabase
-          .from("blood_pressure_measurements")
-          .select("*")
-          .eq("user_id", userId)
-          .order("measured_at", { ascending: false })
-          .limit(30)
-      ),
-      safeQuery(
-        supabase
-          .from("sync_runs")
-          .select("status,finished_at,daily_metrics_upserted,raw_datapoints_upserted,exercises_upserted,sleep_sessions_upserted,body_measurements_upserted,empty_responses,errors_json")
-          .eq("user_id", userId)
-          .order("finished_at", { ascending: false })
-          .limit(1)
-      ),
-      safeQuery(
-        supabase
-          .from("scores")
-          .select("*")
-          .eq("user_id", userId)
-          .order("date", { ascending: false })
-          .limit(28)
-      ),
-      safeQuery(
-        supabase
-          .from("insights")
-          .select("title,explanation,recommendation,confidence")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(3)
-      ),
-      safeQuery(
-        supabase
-          .from("experiments")
-          .select("id,title,hypothesis,metric,baseline_start,intervention_start,intervention_end,result_json,confidence")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-      ),
-      safeQuery(
-        supabase
-          .from("profiles")
-          .select("height_cm, target_weight_kg, age, gender, activity_level")
-          .eq("id", userId)
-          .maybeSingle()
-      ),
-      safeQuery(
-        supabase
-          .from("oauth_tokens")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("provider", "google_health")
-          .maybeSingle()
-      )
-    ]);
+  const [
+    metrics,
+    bodyMeasurements,
+    exercises,
+    manualLogs,
+    bloodPressure,
+    syncRuns,
+    scores,
+    dbInsights,
+    dbExperiments,
+    rawProfileRow,
+    oauthRow,
+    workoutSessions,
+    muscleVolumeWeekly,
+    recentSymptoms
+  ] = await Promise.all([
+    safeQuery(
+      supabase
+        .from("daily_metrics")
+        .select("date,steps,distance_meters,calories_kcal,active_minutes,sleep_minutes,resting_hr,hrv,spo2,respiratory_rate")
+        .eq("user_id", userId)
+        .order("date", { ascending: false })
+        .limit(30)
+    ),
+    safeQuery(
+      supabase
+        .from("body_measurements")
+        .select("*")
+        .eq("user_id", userId)
+        .order("measured_at", { ascending: false })
+        .limit(50)
+    ),
+    safeQuery(
+      supabase
+        .from("exercises")
+        .select("start_time,end_time,display_name,exercise_type,active_duration_seconds,steps,distance_meters,calories_kcal,average_heart_rate,source_platform")
+        .eq("user_id", userId)
+        .order("start_time", { ascending: false })
+        .limit(1)
+    ),
+    safeQuery(
+      supabase
+        .from("manual_daily_logs")
+        .select("*")
+        .eq("user_id", userId)
+        .order("date", { ascending: false })
+        .limit(28)
+    ),
+    safeQuery(
+      supabase
+        .from("blood_pressure_measurements")
+        .select("*")
+        .eq("user_id", userId)
+        .order("measured_at", { ascending: false })
+        .limit(30)
+    ),
+    safeQuery(
+      supabase
+        .from("sync_runs")
+        .select("status,finished_at,daily_metrics_upserted,raw_datapoints_upserted,exercises_upserted,sleep_sessions_upserted,body_measurements_upserted,empty_responses,errors_json")
+        .eq("user_id", userId)
+        .order("finished_at", { ascending: false })
+        .limit(1)
+    ),
+    safeQuery(
+      supabase
+        .from("scores")
+        .select("*")
+        .eq("user_id", userId)
+        .order("date", { ascending: false })
+        .limit(28)
+    ),
+    safeQuery(
+      supabase
+        .from("insights")
+        .select("title,explanation,recommendation,confidence")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(3)
+    ),
+    safeQuery(
+      supabase
+        .from("experiments")
+        .select("id,title,hypothesis,metric,baseline_start,intervention_start,intervention_end,result_json,confidence")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+    ),
+    safeQuery(
+      supabase
+        .from("profiles")
+        .select("height_cm, target_weight_kg, age, gender, activity_level")
+        .eq("id", userId)
+        .maybeSingle()
+    ),
+    safeQuery(
+      supabase
+        .from("oauth_tokens")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("provider", "google_health")
+        .maybeSingle()
+    ),
+    safeQuery(
+      supabase
+        .from("workout_sessions")
+        .select("*")
+        .eq("user_id", userId)
+        .order("date", { ascending: false })
+        .limit(50)
+    ),
+    safeQuery(
+      supabase
+        .from("muscle_volume_daily")
+        .select("*")
+        .eq("user_id", userId)
+        .order("date", { ascending: false })
+        .limit(100)
+    ),
+    safeQuery(
+      supabase
+        .from("symptoms")
+        .select("*")
+        .eq("user_id", userId)
+        .order("date", { ascending: false })
+        .limit(50)
+    )
+  ]);
   const profileRow = rawProfileRow as any;
 
   const dailyMetrics = (metrics ?? []) as DailyMetric[];
@@ -221,7 +259,10 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
         bloodPressureMeasurements: bloodPressure ?? [],
         manualLogs: manualLogs ?? [],
         profileHeight: profileRow?.height_cm ? Number(profileRow.height_cm) : null,
-        targetDate: latestMetric?.date
+        targetDate: latestMetric?.date,
+        workoutSessions: (workoutSessions as any[]) ?? [],
+        muscleVolumeWeekly: (muscleVolumeWeekly as any[]) ?? [],
+        recentSymptoms: (recentSymptoms as any[]) ?? []
       });
   const latestInsights = uniqueInsights((dbInsights ?? []) as InsightRow[]);
   const weeklySteps = average(dailyMetrics.slice(0, 7).map((row) => row.steps));

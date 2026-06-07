@@ -109,6 +109,9 @@ export function calculateAdvancedScores(params: {
   manualLogs: any[];
   profileHeight: number | null;
   targetDate?: string;
+  workoutSessions?: any[];
+  muscleVolumeWeekly?: any[];
+  recentSymptoms?: any[];
 }): HealthScores {
   const {
     dailyMetrics = [],
@@ -116,7 +119,10 @@ export function calculateAdvancedScores(params: {
     bloodPressureMeasurements = [],
     manualLogs = [],
     profileHeight,
-    targetDate
+    targetDate,
+    workoutSessions = [],
+    muscleVolumeWeekly = [],
+    recentSymptoms = []
   } = params;
 
   // 1. Identify target day metric
@@ -309,7 +315,55 @@ export function calculateAdvancedScores(params: {
   const activeMinutesValues = dailyMetrics.map(m => m.active_minutes).filter((v): v is number => typeof v === "number" && v !== null);
   const hasStepsBaseline = dailyMetrics.filter(m => m.steps !== null).length >= 7;
 
-  if (hasStepsBaseline) {
+  const getPastDateStr = (base: string, offsetDays: number) => {
+    try {
+      const d = new Date(base);
+      d.setDate(d.getDate() - offsetDays);
+      return d.toISOString().slice(0, 10);
+    } catch {
+      return base;
+    }
+  };
+
+  const targetDateMinus1 = getPastDateStr(todayStr, 1);
+  const targetDateMinus2 = getPastDateStr(todayStr, 2);
+  const last3Days = [todayStr, targetDateMinus1, targetDateMinus2];
+
+  const recentVolumeRows = muscleVolumeWeekly.filter((v: any) => last3Days.includes(v.date));
+  const recentTrainingLoad = recentVolumeRows.reduce((sum: number, v: any) => sum + Number(v.hard_sets), 0);
+
+  let trainingLoadScore = 75;
+  let trainingLoadValue = "Sin entrenos";
+  let trainingExplanation = "";
+
+  if (recentTrainingLoad > 0) {
+    if (recentTrainingLoad <= 6) {
+      trainingLoadScore = 95;
+      trainingLoadValue = `${recentTrainingLoad.toFixed(1)} series`;
+      trainingExplanation = "Carga baja en 72h. Estímulo óptimo de recuperación.";
+    } else if (recentTrainingLoad <= 12) {
+      trainingLoadScore = 85;
+      trainingLoadValue = `${recentTrainingLoad.toFixed(1)} series`;
+      trainingExplanation = "Carga moderada en 72h. Fatiga normal y controlada.";
+    } else if (recentTrainingLoad <= 18) {
+      trainingLoadScore = 65;
+      trainingLoadValue = `${recentTrainingLoad.toFixed(1)} series`;
+      trainingExplanation = "Carga elevada en 72h. Se sugiere moderar intensidad hoy.";
+    } else {
+      trainingLoadScore = 40;
+      trainingLoadValue = `${recentTrainingLoad.toFixed(1)} series`;
+      trainingExplanation = "Carga excesiva en 72h. Recomendación de descanso o deload.";
+    }
+
+    readinessComponents.push({
+      name: "Carga de Actividad Reciente",
+      score: trainingLoadScore,
+      weight: 0.15,
+      value: trainingLoadValue,
+      baseline: null,
+      explanation: trainingExplanation
+    });
+  } else if (hasStepsBaseline) {
     const avg7 = mean(dailyMetrics.slice(0, 7).map(m => m.steps).filter(Boolean) as number[]);
     const avg28 = mean(dailyMetrics.map(m => m.steps).filter(Boolean) as number[]);
     const ratio = avg28 > 0 ? avg7 / avg28 : 1.0;
@@ -354,12 +408,27 @@ export function calculateAdvancedScores(params: {
   }
 
   // 5. Pain / Soreness Component
+  const todayPainSpots = recentSymptoms.filter(
+    (s: any) => s.date === todayStr && s.type === "pain"
+  );
+  const maxPainIntensity = todayPainSpots.length > 0
+    ? Math.max(...todayPainSpots.map((s: any) => s.intensity))
+    : 0;
+
   let painScore = 100;
   let painLabel = "Sin molestias";
-  const painPresent = todayManualLog?.pain_present || false;
-  if (painPresent) {
+  let painExplanation = "Sin reportes de molestias físicas hoy";
+
+  if (maxPainIntensity > 0) {
+    const uiScalePain = maxPainIntensity * 2;
+    painScore = Math.max(10, 100 - uiScalePain * 10);
+    const locations = todayPainSpots.map((s: any) => `${s.location} (${s.intensity * 2}/10)`).join(", ");
+    painLabel = `Dolor ${uiScalePain}/10`;
+    painExplanation = `Molestia detectada en: ${locations}`;
+  } else if (todayManualLog?.pain_present) {
     painScore = 55;
     painLabel = "Con molestias";
+    painExplanation = "Se detectaron dolores o molestias musculares hoy (manual)";
   }
 
   readinessComponents.push({
@@ -368,7 +437,7 @@ export function calculateAdvancedScores(params: {
     weight: 0.10,
     value: painLabel,
     baseline: null,
-    explanation: painPresent ? "Se detectaron dolores o molestias musculares hoy" : "Sin reportes de molestias físicas"
+    explanation: painExplanation
   });
 
   // 6. Subjective Energy Component
@@ -431,7 +500,12 @@ export function calculateAdvancedScores(params: {
       overridesApplied.push("sueño muy bajo (<5h)");
     }
     // 2. Severe pain
-    if (painPresent) {
+    const isSeverePain = maxPainIntensity >= 3;
+    if (isSeverePain) {
+      rawScore = Math.min(rawScore, 55);
+      const highPainLocs = todayPainSpots.filter((s: any) => s.intensity >= 3).map((s: any) => s.location).join(", ");
+      overridesApplied.push(`dolor muscular alto en ${highPainLocs}`);
+    } else if (todayManualLog?.pain_present) {
       rawScore = Math.min(rawScore, 55);
       overridesApplied.push("dolor físico reportado");
     }
@@ -449,6 +523,17 @@ export function calculateAdvancedScores(params: {
         overridesApplied.push("fatiga autonómica (HRV deprimida y RHR elevada sostenidas)");
       }
     }
+    // 3b. Over-training override
+    if (recentTrainingLoad > 15 && hrvDone && rhrDone) {
+      const bHrv = median(hrvValues);
+      const bRhr = median(rhrValues);
+      const hrvDrop = todayHrv ? (bHrv - todayHrv) / bHrv : 0;
+      const rhrIncrease = todayRhr ? todayRhr - bRhr : 0;
+      if (hrvDrop > 0.15 || rhrIncrease > 4) {
+        rawScore = Math.min(rawScore, 55);
+        overridesApplied.push("fatiga acumulada por entrenamiento intenso");
+      }
+    }
     // 4. Blood pressure override
     if (todayBp) {
       if (todayBp.systolic >= 180 || todayBp.diastolic >= 120) {
@@ -456,7 +541,11 @@ export function calculateAdvancedScores(params: {
         overridesApplied.push("presión arterial crítica");
       } else if (todayBp.systolic >= 140 || todayBp.diastolic >= 90) {
         rawScore = Math.min(rawScore, 70);
-        overridesApplied.push("presión arterial alta");
+        if (todayBp.systolic >= 140 && todayBp.diastolic < 90) {
+          overridesApplied.push("sistólica elevada registrada");
+        } else {
+          overridesApplied.push("presión arterial alta");
+        }
       }
     }
 
@@ -627,7 +716,17 @@ export function calculateAdvancedScores(params: {
   let longTermActivityScore: number | null = null;
   const steps7d = dailyMetrics.slice(0, 7).map(m => m.steps).filter((v): v is number => typeof v === "number" && v !== null);
   const activeMins7d = dailyMetrics.slice(0, 7).map(m => m.active_minutes).filter((v): v is number => typeof v === "number" && v !== null);
-  if (activeMins7d.length > 0 || steps7d.length > 0) {
+  const workouts7d = workoutSessions.filter((s: any) => {
+    try {
+      const diffDays = (new Date(todayStr).getTime() - new Date(s.date).getTime()) / (1000 * 60 * 60 * 24);
+      return diffDays >= 0 && diffDays < 7;
+    } catch {
+      return false;
+    }
+  });
+  const workoutCount7d = workouts7d.length;
+
+  if (activeMins7d.length > 0 || steps7d.length > 0 || workoutCount7d > 0) {
     const totalActive = activeMins7d.reduce((a, b) => a + b, 0);
     let activeScore = 10;
     if (totalActive >= 300) activeScore = 100;
@@ -640,17 +739,31 @@ export function calculateAdvancedScores(params: {
     else if (avgSteps >= 6000) stepsScore = 80;
     else if (avgSteps >= 3000) stepsScore = 55;
 
-    longTermActivityScore = activeMins7d.length > 0
+    let baseActivity = activeMins7d.length > 0
       ? Math.round(activeScore * 0.8 + stepsScore * 0.2)
       : stepsScore;
+
+    const workoutBoost = Math.min(15, workoutCount7d * 5);
+    longTermActivityScore = Math.min(100, baseActivity + workoutBoost);
+
+    healthComponents.push({
+      name: "Actividad Física (Largo Plazo)",
+      score: longTermActivityScore,
+      weight: 0.15,
+      value: `${workoutCount7d} entrenos, ${Math.round(avgSteps).toLocaleString("es-AR")} pasos (7d)`,
+      baseline: null,
+      explanation: `Evaluado sobre pasos de 7d, minutos activos y ${workoutCount7d} entrenamientos (+${workoutBoost} pts boost)`
+    });
+  } else {
+    healthComponents.push({
+      name: "Actividad Física (Largo Plazo)",
+      score: null,
+      weight: 0.15,
+      value: "Sin datos",
+      baseline: null,
+      explanation: "Sin datos de pasos ni de entrenamientos registrados esta semana"
+    });
   }
-  healthComponents.push({
-    name: "Actividad Física (Largo Plazo)",
-    score: longTermActivityScore,
-    weight: 0.15,
-    value: longTermActivityScore !== null ? `${longTermActivityScore}/100` : "Sin datos",
-    explanation: "Evaluado sobre pasos de 7 días y minutos de actividad de moderada a intensa"
-  });
 
   // 4. Body Composition Domain (Long-term)
   let compositionScore: number | null = null;
@@ -765,19 +878,21 @@ export function calculateAdvancedScores(params: {
 
     const muscleChange = (armLeftChange + armRightChange + thighLeftChange + thighRightChange) / 2;
 
+    const totalVolume28d = (muscleVolumeWeekly || []).reduce((sum: number, v: any) => sum + Number(v.hard_sets), 0);
+
     // Detect recomposition, clean bulk, deficit, fat gain
-    if (waistChange !== null && waistChange <= -0.5 && muscleChange >= 0.2 && Math.abs(weightChange) <= 1.5) {
+    if (waistChange !== null && waistChange <= -0.5 && (muscleChange >= 0.2 || totalVolume28d >= 12) && Math.abs(weightChange) <= 1.5) {
       bodyScore = 95;
-      bodyExplanation = "Señal compatible con recomposición corporal positiva: reducción de cintura y aumento de medidas musculares con peso estable.";
-    } else if (weightChange >= 0.8 && waistChange !== null && waistChange <= 0.8 && muscleChange >= 0.2) {
+      bodyExplanation = `Señal compatible con recomposición corporal positiva: reducción de cintura (${waistChange.toFixed(1)} cm) con volumen activo (${totalVolume28d.toFixed(1)} series).`;
+    } else if (weightChange >= 0.8 && waistChange !== null && waistChange <= 0.8 && (muscleChange >= 0.2 || totalVolume28d >= 15)) {
       bodyScore = 90;
-      bodyExplanation = "Señal compatible con aumento limpio de masa muscular (volumen limpio): incremento de peso y medidas musculares con cintura controlada.";
+      bodyExplanation = `Señal compatible con aumento limpio de masa muscular (volumen limpio): incremento de peso con cintura controlada y volumen activo (${totalVolume28d.toFixed(1)} series).`;
     } else if (weightChange <= -1.0 && waistChange !== null && waistChange <= -0.8 && Math.abs(muscleChange) < 0.5) {
       bodyScore = 92;
-      bodyExplanation = "Señal compatible con pérdida de grasa exitosa (definición): reducción notable de peso y cintura preservando las medidas musculares.";
-    } else if (weightChange >= 1.0 && waistChange !== null && waistChange >= 1.0 && muscleChange <= 0) {
+      bodyExplanation = "Señal compatible con pérdida de grasa exitosa (definición): reducción notable de peso y cintura preservando la masa muscular.";
+    } else if (weightChange >= 1.0 && waistChange !== null && waistChange >= 1.0 && totalVolume28d < 8) {
       bodyScore = 42;
-      bodyExplanation = "Señal compatible con probable ganancia de grasa o retención: aumento rápido de peso y cintura sin incrementos en medidas musculares.";
+      bodyExplanation = "Señal compatible con probable ganancia grasa o retención: aumento de peso y cintura con volumen de entrenamiento de fuerza bajo.";
     } else {
       bodyScore = 75;
       bodyExplanation = "Medidas y composición corporal estables en comparación con tu medición de hace más de 14 días.";
@@ -858,14 +973,26 @@ export function calculateAdvancedScores(params: {
   const last3Rhr = dailyMetrics.slice(0, 3).map(m => m.resting_hr).filter((v): v is number => typeof v === "number" && v !== null);
   const last3Hrv = dailyMetrics.slice(0, 3).map(m => m.hrv).filter((v): v is number => typeof v === "number" && v !== null);
 
-  // 1. Critical BP
+  // 1. Critical/High BP and Pulse Pressure Alerts
   if (todayBp) {
+    const pulsePressure = todayBp.systolic - todayBp.diastolic;
+    const isWidePulsePressure = pulsePressure >= 60;
+    const isIsolatedSystolic = todayBp.systolic >= 140 && todayBp.diastolic < 90;
+
     if (todayBp.systolic >= 180 || todayBp.diastolic >= 120) {
       alerts.push({
         severity: "critical",
         category: "cardiovascular",
         title: "Presión arterial crítica",
-        message: `Se registró una presión arterial de ${todayBp.systolic}/${todayBp.diastolic} mmHg. Se sugiere reposar en un ambiente tranquilo y repetir la medición. Si los valores siguen altos o presentas dolor en el pecho, falta de aire o dolor de cabeza severo, busca atención médica de inmediato.`,
+        message: `Se registró una presión arterial de ${todayBp.systolic}/${todayBp.diastolic} mmHg. Se sugiere reposar en un ambiente tranquilo y repetir la medición. Si los valores siguen altos o presentas dolor en el pecho, falta de aire o dolor de cabeza severo, busca atención médica de inmediato.${isWidePulsePressure ? ` Se observa una presión de pulso muy amplia de ${pulsePressure} mmHg.` : ""}`,
+        relatedMetric: "blood_pressure"
+      });
+    } else if (isIsolatedSystolic) {
+      alerts.push({
+        severity: "warning",
+        category: "cardiovascular",
+        title: "Sistólica elevada registrada",
+        message: `Se detectó una presión sistólica elevada (${todayBp.systolic} mmHg) con una diastólica normal (${todayBp.diastolic} mmHg), consistente con hipertensión sistólica aislada. Asimismo, presenta una presión de pulso amplia (${pulsePressure} mmHg, normal < 50-60 mmHg), lo cual puede indicar rigidez arterial. Se recomienda monitorear con regularidad en reposo y consultarlo con tu médico.`,
         relatedMetric: "blood_pressure"
       });
     } else if (todayBp.systolic >= 140 || todayBp.diastolic >= 90) {
@@ -873,7 +1000,15 @@ export function calculateAdvancedScores(params: {
         severity: "warning",
         category: "cardiovascular",
         title: "Presión arterial alta",
-        message: `El registro de presión arterial (${todayBp.systolic}/${todayBp.diastolic} mmHg) califica como elevado. Conviene realizar monitoreos en reposo de forma regular y consultarlo con tu médico.`,
+        message: `El registro de presión arterial (${todayBp.systolic}/${todayBp.diastolic} mmHg) califica como elevado. Conviene realizar monitoreos en reposo de forma regular y consultarlo con tu médico.${isWidePulsePressure ? ` Se observa una presión de pulso amplia de ${pulsePressure} mmHg (normal < 50-60 mmHg).` : ""}`,
+        relatedMetric: "blood_pressure"
+      });
+    } else if (isWidePulsePressure) {
+      alerts.push({
+        severity: "info",
+        category: "cardiovascular",
+        title: "Presión de pulso amplia",
+        message: `Aunque tu presión arterial se encuentra en rangos aceptables (${todayBp.systolic}/${todayBp.diastolic} mmHg), la diferencia entre sistólica y diastólica es de ${pulsePressure} mmHg (presión de pulso amplia, normal < 50-60 mmHg). Sigue monitoreando en reposo.`,
         relatedMetric: "blood_pressure"
       });
     }
@@ -1026,7 +1161,16 @@ export async function calculateScoresAndInsights(
     .order("date", { ascending: false })
     .limit(28);
 
-  const [{ data: metrics }, { data: bodyRows }, { data: manualLogs }, { data: bloodPressure }, { data: profileRow }] = await Promise.all([
+  const [
+    { data: metrics },
+    { data: bodyRows },
+    { data: manualLogs },
+    { data: bloodPressure },
+    { data: profileRow },
+    { data: workoutSessions },
+    { data: muscleVolumeWeekly },
+    { data: recentSymptoms }
+  ] = await Promise.all([
     metricsQuery,
     supabase
       .from("body_measurements")
@@ -1050,7 +1194,25 @@ export async function calculateScoresAndInsights(
       .from("profiles")
       .select("height_cm,target_weight_kg")
       .eq("id", userId)
-      .maybeSingle()
+      .maybeSingle(),
+    supabase
+      .from("workout_sessions")
+      .select("*")
+      .eq("user_id", userId)
+      .order("date", { ascending: false })
+      .limit(50),
+    supabase
+      .from("muscle_volume_daily")
+      .select("*")
+      .eq("user_id", userId)
+      .order("date", { ascending: false })
+      .limit(100),
+    supabase
+      .from("symptoms")
+      .select("*")
+      .eq("user_id", userId)
+      .order("date", { ascending: false })
+      .limit(50)
   ]);
 
   const dailyMetrics = (metrics ?? []) as DailyMetric[];
@@ -1089,7 +1251,10 @@ export async function calculateScoresAndInsights(
     bloodPressureMeasurements: bloodPressure ?? [],
     manualLogs: manualLogs ?? [],
     profileHeight: height,
-    targetDate: latest.date
+    targetDate: latest.date,
+    workoutSessions: workoutSessions ?? [],
+    muscleVolumeWeekly: muscleVolumeWeekly ?? [],
+    recentSymptoms: recentSymptoms ?? []
   });
 
   // Backward compatibility mappings

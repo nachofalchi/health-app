@@ -187,7 +187,7 @@ h1, h2, h3, h4 {
 .shell {
   width: min(720px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 24px 0 calc(var(--tabbar-h) + 24px);
+  padding: 24px 0 calc(var(--tabbar-h) + 64px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ==========================================
@@ -2270,5 +2270,15 @@ label:has(input[name="heavy_meal_at_night"]:checked) .heavymeal-chip {
 /* Dark mode overrides for pillars */
 [data-theme="dark"] .pillar-card {
   border: 1px solid var(--line);
+}
+
+.pillar-card.warning-state {
+  border-color: rgba(255, 149, 0, 0.45) !important;
+  background: rgba(255, 149, 0, 0.04) !important;
+}
+
+[data-theme="dark"] .pillar-card.warning-state {
+  border-color: rgba(255, 149, 0, 0.35) !important;
+  background: rgba(255, 149, 0, 0.06) !important;
 }
 

@@ -26,6 +26,7 @@ import {
 import { ExperimentsPanel } from "@/components/experiments-panel";
 import { DashboardControlCenter } from "@/components/dashboard-control-center";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { TrainingPanel } from "@/components/training-panel";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type DayInsight = { title: string; body: string; confidence: string };
@@ -153,7 +154,7 @@ const TOAST_ICONS: Record<ToastType, string> = {
   success: "✅", error: "❌", info: "🔄", warning: "⚠️",
 };
 
-type TabId = "summary" | "experiments" | "log" | "profile";
+type TabId = "summary" | "workout" | "log" | "profile";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export function DashboardTabs({
@@ -359,9 +360,9 @@ export function DashboardTabs({
           
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {[
-              { id: "readiness", title: "Disponibilidad Diaria", data: advancedScores.dailyReadiness },
-              { id: "health", title: "Índice de Salud", data: advancedScores.healthIndex },
-              { id: "body", title: "Progreso Corporal", data: advancedScores.bodyProgress }
+              { id: "readiness", title: "Disponibilidad diaria", data: advancedScores.dailyReadiness },
+              { id: "health", title: "Índice de salud general", data: advancedScores.healthIndex },
+              { id: "body", title: "Progreso corporal", data: advancedScores.bodyProgress }
             ].map(({ id, title, data }) => {
               if (!data) return null;
               const isExpanded = expandedPillar === id;
@@ -773,15 +774,20 @@ export function DashboardTabs({
           <ThemeToggle />
         </div>
       </div>
+
+      {/* Experimentos / Tests Clínicos */}
+      <div style={{ marginTop: "24px" }}>
+        <ExperimentsPanel experiments={experiments} />
+      </div>
     </div>
   );
 
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
     <>
-      <div style={{ paddingBottom: "4px" }}>
+      <div style={{ paddingBottom: "16px" }}>
         {activeTab === "summary"     && renderSummary()}
-        {activeTab === "experiments" && <ExperimentsPanel experiments={experiments} />}
+        {activeTab === "workout"     && <TrainingPanel advancedScores={advancedScores} showToast={showToast} />}
         {activeTab === "log"         && <DashboardControlCenter />}
         {activeTab === "profile"     && renderProfile()}
       </div>
@@ -791,7 +797,7 @@ export function DashboardTabs({
         {(
           [
             { id: "summary",     Icon: Sparkles,       label: "Inicio" },
-            { id: "experiments", Icon: Beaker,          label: "Tests" },
+            { id: "workout",     Icon: Dumbbell,       label: "Entreno" },
             { id: "log",         Icon: ClipboardList,   label: "Registro" },
             { id: "profile",     Icon: User,            label: "Perfil" },
           ] as { id: TabId; Icon: any; label: string }[]
