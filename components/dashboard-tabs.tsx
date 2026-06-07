@@ -61,6 +61,7 @@ type DashboardTabsProps = {
     status: string;
     summary: string;
     insights: DayInsight[];
+    trainingRecommendation?: string;
   };
   sectorCards: SectorCard[];
   latestExercise: Exercise | null;
@@ -83,6 +84,7 @@ type DashboardTabsProps = {
   } | null;
   isGoogleHealthConnected: boolean;
   advancedScores?: any;
+  anomalies?: Array<{ title: string; body: string; severity: "warning" | "danger" }> | null;
 };
 
 // ─── Icon Map ────────────────────────────────────────────────────────────────
@@ -156,6 +158,97 @@ const TOAST_ICONS: Record<ToastType, string> = {
 
 type TabId = "summary" | "workout" | "log" | "profile";
 
+const trainingTone: Record<string, string> = {
+  Fuerte: "good",
+  Moderado: "watch",
+  Liviano: "watch",
+  Recuperacion: "care",
+  Descanso: "care"
+};
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Buenos días";
+  if (h < 18) return "Buenas tardes";
+  return "Buenas noches";
+}
+
+function formatDate() {
+  return new Date().toLocaleDateString("es-AR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long"
+  });
+}
+
+function PillarCard({
+  title,
+  pillar,
+  colorClass,
+  svgColor
+}: {
+  title: string;
+  pillar: any;
+  colorClass: string;
+  svgColor: string;
+}) {
+  const R_MINI = 22;
+  const CIRC_MINI = 2 * Math.PI * R_MINI;
+  const score = pillar.score;
+  const off = CIRC_MINI - (CIRC_MINI * (score ?? 0)) / 100;
+  
+  const hasOverride = pillar.explanation.toLowerCase().includes("override");
+  const activeSvgColor = hasOverride ? "var(--amber)" : svgColor;
+  
+  const algoLabel = pillar.algorithmUsed === "baseline_personalizado" 
+    ? "Baseline" 
+    : "Por reglas";
+  
+  const confLabels: Record<string, string> = {
+    alta: "Confianza Alta",
+    media: "Confianza Media",
+    baja: "Confianza Baja",
+    insuficiente: "Sin datos suf."
+  };
+
+  return (
+    <div className={`pillar-card theme-${colorClass}${hasOverride ? " warning-state" : ""}`}>
+      <div className="pillar-header-row">
+        <h3>{title}</h3>
+        <span className={`conf-tag conf-${pillar.confidence}`}>
+          {confLabels[pillar.confidence] || pillar.confidence}
+        </span>
+      </div>
+      
+      <div className="pillar-content-row">
+        <div className="mini-ring-wrap" style={{ position: "relative", width: "50px", height: "50px" }}>
+          <svg viewBox="0 0 50 50" aria-hidden style={{ width: "100%", height: "100%" }}>
+            <circle className="mini-ring-track" cx="25" cy="25" r={R_MINI} style={{ stroke: "var(--line)" }} />
+            <circle
+              className="mini-ring-fill"
+              cx="25"
+              cy="25"
+              r={R_MINI}
+              strokeDasharray={CIRC_MINI}
+              strokeDashoffset={off}
+              stroke={activeSvgColor}
+              style={{ filter: `drop-shadow(0 0 3px ${activeSvgColor}66)`, transform: "rotate(-90deg)", transformOrigin: "50% 50%" }}
+            />
+          </svg>
+          <span className="mini-ring-val" style={{ fontSize: "0.85rem", fontWeight: 700 }}>
+            {score !== null && score !== undefined ? score : "--"}
+          </span>
+        </div>
+
+        <div className="pillar-details">
+          <span className="pillar-algo">Modo: {algoLabel}</span>
+          <p className="pillar-desc-text">{pillar.explanation}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export function DashboardTabs({
   day,
@@ -169,6 +262,7 @@ export function DashboardTabs({
   profile,
   isGoogleHealthConnected,
   advancedScores,
+  anomalies,
 }: DashboardTabsProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabId>("summary");
@@ -782,11 +876,163 @@ export function DashboardTabs({
     </div>
   );
 
+  const renderSummaryTab = () => {
+    const greeting = getGreeting();
+    const dateStr = formatDate();
+    
+    const allAlerts = [
+      ...(advancedScores?.alerts || []).map((alert: any) => ({
+        title: alert.title,
+        body: alert.message,
+        severity: alert.severity === "critical" ? "danger" as const : (alert.severity === "warning" ? "warning" as const : "info" as const),
+        category: alert.category
+      })),
+      ...(anomalies || []).map((anomaly: any) => ({
+        title: anomaly.title,
+        body: anomaly.body,
+        severity: anomaly.severity,
+        category: "anomaly"
+      }))
+    ];
+
+    const generalScoreObj = advancedScores?.generalScore || { score: day.overall, confidence: "media", explanation: "" };
+    const generalScore = generalScoreObj.score;
+    const generalConf = generalScoreObj.confidence;
+    const generalExpl = generalScoreObj.explanation;
+
+    const tone = generalScore !== null && generalScore !== undefined
+      ? (generalScore >= 75 ? "good" : generalScore >= 50 ? "watch" : "care")
+      : "muted";
+      
+    const prepText = generalScore !== null && generalScore !== undefined
+      ? (generalScore >= 75 ? "Preparación alta" : generalScore >= 50 ? "Preparación media" : "Necesita recuperación")
+      : "Sin datos de preparación";
+
+    const trainingChipTone = trainingTone[day.trainingRecommendation || ""] ?? "watch";
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        {/* ─── Top Header ───────────────────────────────────────────── */}
+        <header className="app-header">
+          <div className="header-greeting">
+            <span className="greeting-sub">{dateStr}</span>
+            <h1>{greeting}</h1>
+          </div>
+          <div className="header-actions">
+            <span
+              className={`sync-badge-pill${isGoogleHealthConnected ? "" : " disconnected"}`}
+              aria-label={isGoogleHealthConnected ? "Google Health conectado" : "Google Health sin vincular"}
+            >
+              <span className="dot" />
+              {isGoogleHealthConnected ? "Sync OK" : "Sin vincular"}
+            </span>
+          </div>
+        </header>
+
+        {/* ─── Alertas / Red Flags (Clinical Alerts) ────────────────── */}
+        {allAlerts.length > 0 && (
+          <section aria-label="Alertas y Notificaciones de Salud" style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
+            {allAlerts.map((alert: any, i: number) => {
+              const isDanger = alert.severity === "danger";
+              const isWarning = alert.severity === "warning";
+              const emoji = isDanger ? "🔴" : (isWarning ? "🟡" : "ℹ️");
+              return (
+                <div
+                  key={i}
+                  className={`anomaly-banner ${alert.severity}`}
+                >
+                  <span style={{ fontSize: "1.2rem", lineHeight: 1, marginRight: "4px" }}>
+                    {emoji}
+                  </span>
+                  <div>
+                    <strong>{alert.title}</strong>
+                    <p>{alert.body}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        )}
+
+        {/* ─── Advanced Scores: Pillars ────────────────────────────── */}
+        <section className="pillars-section" aria-label="Pilares de Salud y Rendimiento" style={{ marginBottom: "24px" }}>
+          <h2 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "12px", color: "var(--ink)" }}>Puntuación del día</h2>
+          
+          {advancedScores ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <PillarCard 
+                title="Disponibilidad diaria" 
+                pillar={advancedScores.dailyReadiness} 
+                colorClass="readiness" 
+                svgColor="var(--green)"
+              />
+              <PillarCard 
+                title="Índice de salud general" 
+                pillar={advancedScores.healthIndex} 
+                colorClass="health-index" 
+                svgColor="var(--accent)"
+              />
+              <PillarCard 
+                title="Progreso corporal" 
+                pillar={advancedScores.bodyProgress} 
+                colorClass="body-progress" 
+                svgColor="var(--purple)"
+              />
+            </div>
+          ) : (
+            <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>Cargando puntuaciones avanzadas...</p>
+          )}
+        </section>
+
+        {/* ─── Combined General Score Row ───────────────────────────── */}
+        <section className="score-hero" aria-label="Score diario general" style={{ padding: "16px", borderRadius: "var(--radius-lg)", background: "var(--panel)", border: "1px solid var(--line)", marginBottom: "24px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+            <div>
+              <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)" }}>
+                Puntuación General Integrada
+              </span>
+              <h2 style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--ink)", marginTop: "4px" }}>{prepText}</h2>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+              <div className="ring-label" style={{ display: "inline-flex", alignItems: "baseline", gap: "2px" }}>
+                <span className="num" style={{ fontSize: "1.8rem", fontWeight: 900, color: `var(--${tone === 'good' ? 'green' : (tone === 'watch' ? 'amber' : 'red')})` }}>
+                  {generalScore !== null && generalScore !== undefined ? generalScore : "--"}
+                </span>
+                <span className="unit" style={{ fontSize: "0.8rem", color: "var(--muted)" }}>/100</span>
+              </div>
+              <span className={`conf-tag conf-${generalConf}`} style={{ fontSize: "0.65rem", padding: "2px 6px" }}>
+                Confianza {generalConf}
+              </span>
+            </div>
+          </div>
+
+          {generalExpl && (
+            <p style={{ fontSize: "0.82rem", color: "var(--ink-2)", lineHeight: 1.4, margin: "8px 0 12px 0" }}>
+              {generalExpl}
+            </p>
+          )}
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--line)", paddingTop: "12px", marginTop: "8px" }}>
+            <span style={{ fontSize: "0.78rem", color: "var(--muted)" }}>
+              Actividad de hoy
+            </span>
+            <div className={`training-chip ${trainingChipTone}`}>
+              <Dumbbell size={13} aria-hidden />
+              {day.trainingRecommendation}
+            </div>
+          </div>
+        </section>
+
+        {renderSummary()}
+      </div>
+    );
+  };
+
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
     <>
       <div style={{ paddingBottom: "16px" }}>
-        {activeTab === "summary"     && renderSummary()}
+        {activeTab === "summary"     && renderSummaryTab()}
         {activeTab === "workout"     && <TrainingPanel advancedScores={advancedScores} showToast={showToast} />}
         {activeTab === "log"         && <DashboardControlCenter />}
         {activeTab === "profile"     && renderProfile()}
