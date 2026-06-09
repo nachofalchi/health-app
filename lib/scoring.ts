@@ -36,7 +36,7 @@ export type HealthScores = {
   };
   alerts: Array<{
     severity: "info" | "warning" | "critical";
-    category: "cardiovascular" | "sleep" | "recovery" | "body_composition" | "pain" | "data_quality" | "general";
+    category: "cardiovascular" | "sleep" | "recovery" | "body_composition" | "pain" | "data_quality" | "general" | "environment";
     title: string;
     message: string;
     relatedMetric?: string;

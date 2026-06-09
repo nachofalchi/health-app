@@ -85,6 +85,8 @@ type DashboardTabsProps = {
   isGoogleHealthConnected: boolean;
   advancedScores?: any;
   anomalies?: Array<{ title: string; body: string; severity: "warning" | "danger" }> | null;
+  environmentSettings?: any;
+  environmentForecasts?: any[];
 };
 
 // ─── Icon Map ────────────────────────────────────────────────────────────────
@@ -263,6 +265,8 @@ export function DashboardTabs({
   isGoogleHealthConnected,
   advancedScores,
   anomalies,
+  environmentSettings,
+  environmentForecasts,
 }: DashboardTabsProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabId>("summary");
@@ -293,6 +297,100 @@ export function DashboardTabs({
     setToasts((prev) => [...prev, { id, message, type, icon: TOAST_ICONS[type] }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
   }, []);
+
+  // Environment Settings State
+  const [envEnabled, setEnvEnabled] = useState<boolean>(
+    environmentSettings?.atmospheric_pressure_tracking_enabled ?? false
+  );
+  const [envThreshold, setEnvThreshold] = useState<string>(
+    environmentSettings?.atmospheric_pressure_threshold_hpa?.toString() ?? "1025"
+  );
+  const [envProvider, setEnvProvider] = useState<string>(
+    environmentSettings?.weather_provider ?? "open_meteo"
+  );
+  const [envSustainedOnly, setEnvSustainedOnly] = useState<boolean>(
+    environmentSettings?.alert_sustained_pressure_only ?? true
+  );
+  const [envLocationName, setEnvLocationName] = useState<string>(
+    environmentSettings?.location_name ?? ""
+  );
+  const [envLatitude, setEnvLatitude] = useState<string>(
+    environmentSettings?.location_latitude?.toString() ?? ""
+  );
+  const [envLongitude, setEnvLongitude] = useState<string>(
+    environmentSettings?.location_longitude?.toString() ?? ""
+  );
+  const [envTimezone, setEnvTimezone] = useState<string>(
+    environmentSettings?.location_timezone ?? "auto"
+  );
+  const [isSavingEnvSettings, setIsSavingEnvSettings] = useState(false);
+  const [isRefreshingEnvForecast, setIsRefreshingEnvForecast] = useState(false);
+
+  async function handleEnvSettingsSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setIsSavingEnvSettings(true);
+    try {
+      const res = await fetch("/api/environment/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          atmospheric_pressure_tracking_enabled: envEnabled,
+          atmospheric_pressure_threshold_hpa: envThreshold ? Number(envThreshold) : 1025,
+          weather_provider: envProvider,
+          alert_sustained_pressure_only: envSustainedOnly,
+          location_name: envLocationName || null,
+          location_latitude: envLatitude ? Number(envLatitude) : null,
+          location_longitude: envLongitude ? Number(envLongitude) : null,
+          location_timezone: envTimezone || "auto",
+        }),
+      });
+
+      if (!res.ok) {
+        const p = await res.json().catch(() => null);
+        showToast(p?.message ?? "Error al guardar la configuración de ambiente.", "error");
+        return;
+      }
+
+      const data = await res.json();
+      if (data.forecastError) {
+        showToast(`Guardado con éxito, pero falló la actualización del clima: ${data.forecastError}`, "warning");
+      } else {
+        showToast("Configuración ambiental guardada ✓", "success");
+      }
+      router.refresh();
+    } catch {
+      showToast("Error de conexión.", "error");
+    } finally {
+      setIsSavingEnvSettings(false);
+    }
+  }
+
+  async function handleEnvForecastRefresh() {
+    if (!envLatitude || !envLongitude) {
+      showToast("Establece la ubicación antes de actualizar.", "warning");
+      return;
+    }
+    setIsRefreshingEnvForecast(true);
+    showToast("Actualizando presión atmosférica...", "info");
+    try {
+      const res = await fetch("/api/environment/refresh", {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        const p = await res.json().catch(() => null);
+        showToast(p?.message ?? "Error al actualizar clima.", "error");
+        return;
+      }
+
+      showToast("Presión atmosférica actualizada ✓", "success");
+      router.refresh();
+    } catch {
+      showToast("Error de conexión.", "error");
+    } finally {
+      setIsRefreshingEnvForecast(false);
+    }
+  }
 
   async function handleProfileSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -860,6 +958,190 @@ export function DashboardTabs({
         )}
       </div>
 
+      {/* Settings: Ambiente y clima */}
+      <div className="settings-section">
+        <p className="settings-section-title">Ambiente y clima</p>
+        <form onSubmit={handleEnvSettingsSubmit}>
+          <div className="settings-row" style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: "10px", padding: "16px 20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <span className="settings-row-label" style={{ fontWeight: 600 }}>Presión atmosférica</span>
+                <span className="settings-row-desc" style={{ fontSize: "0.75rem", color: "var(--muted)", maxWidth: "85%", lineHeight: 1.3 }}>
+                  Usá la presión atmosférica como contexto ambiental. La app te avisará si se espera presión alta.
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={envEnabled}
+                onChange={(e) => setEnvEnabled(e.target.checked)}
+                style={{ width: "18px", height: "18px", cursor: "pointer" }}
+              />
+            </div>
+          </div>
+
+          {envEnabled && (
+            <div style={{ padding: "0 20px 16px 20px", display: "flex", flexDirection: "column", gap: "12px" }}>
+              
+              {/* Threshold input */}
+              <div className="profile-field-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--line-light)", paddingBottom: "10px" }}>
+                <label htmlFor="env-threshold" style={{ fontSize: "0.85rem", color: "var(--ink)", fontWeight: 600 }}>Umbral de presión alta</label>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <input
+                    id="env-threshold"
+                    type="number"
+                    min="950"
+                    max="1080"
+                    value={envThreshold}
+                    onChange={(e) => setEnvThreshold(e.target.value)}
+                    style={{ width: "80px", textAlign: "right", padding: "4px 8px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--panel)" }}
+                  />
+                  <span style={{ fontSize: "0.82rem", color: "var(--muted)" }}>hPa</span>
+                </div>
+              </div>
+              <p style={{ fontSize: "0.75rem", color: "var(--muted)", margin: "-6px 0 6px 0", lineHeight: 1.3 }}>
+                Predeterminado: 1025 hPa. Valores más altos generan menos alertas.
+              </p>
+
+              {/* Sustained alert toggle */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--line-light)", paddingBottom: "10px" }}>
+                <label htmlFor="env-sustained" style={{ fontSize: "0.85rem", color: "var(--ink)", fontWeight: 600 }}>Avisar solo si se mantiene alta</label>
+                <input
+                  id="env-sustained"
+                  type="checkbox"
+                  checked={envSustainedOnly}
+                  onChange={(e) => setEnvSustainedOnly(e.target.checked)}
+                  style={{ width: "16px", height: "16px", cursor: "pointer" }}
+                />
+              </div>
+              <p style={{ fontSize: "0.75rem", color: "var(--muted)", margin: "-6px 0 6px 0", lineHeight: 1.3 }}>
+                Se requiere al menos 3 horas consecutivas sobre el umbral para disparar la alerta.
+              </p>
+
+              {/* Weather Provider */}
+              <div className="profile-field-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--line-light)", paddingBottom: "10px" }}>
+                <span style={{ fontSize: "0.85rem", color: "var(--ink)", fontWeight: 600 }}>Fuente de clima</span>
+                <span style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Open-Meteo</span>
+              </div>
+
+              {/* Location configuration */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" }}>
+                <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Ubicación para clima</span>
+                
+                <div className="profile-field-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <label htmlFor="env-city" style={{ fontSize: "0.82rem", color: "var(--ink-2)" }}>Ciudad / Región</label>
+                  <input
+                    id="env-city"
+                    type="text"
+                    placeholder="Ej. Buenos Aires"
+                    value={envLocationName}
+                    onChange={(e) => setEnvLocationName(e.target.value)}
+                    style={{ width: "180px", padding: "4px 8px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--panel)" }}
+                  />
+                </div>
+
+                <div className="profile-field-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <label htmlFor="env-latitude" style={{ fontSize: "0.82rem", color: "var(--ink-2)" }}>Latitud</label>
+                  <input
+                    id="env-latitude"
+                    type="number"
+                    step="0.0001"
+                    placeholder="Ej. -34.6037"
+                    value={envLatitude}
+                    onChange={(e) => setEnvLatitude(e.target.value)}
+                    style={{ width: "180px", padding: "4px 8px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--panel)" }}
+                  />
+                </div>
+
+                <div className="profile-field-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <label htmlFor="env-longitude" style={{ fontSize: "0.82rem", color: "var(--ink-2)" }}>Longitud</label>
+                  <input
+                    id="env-longitude"
+                    type="number"
+                    step="0.0001"
+                    placeholder="Ej. -58.3816"
+                    value={envLongitude}
+                    onChange={(e) => setEnvLongitude(e.target.value)}
+                    style={{ width: "180px", padding: "4px 8px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--panel)" }}
+                  />
+                </div>
+
+                <div className="profile-field-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <label htmlFor="env-timezone" style={{ fontSize: "0.82rem", color: "var(--ink-2)" }}>Zona horaria</label>
+                  <input
+                    id="env-timezone"
+                    type="text"
+                    placeholder="America/Argentina/Buenos_Aires"
+                    value={envTimezone}
+                    onChange={(e) => setEnvTimezone(e.target.value)}
+                    style={{ width: "180px", padding: "4px 8px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--panel)" }}
+                  />
+                </div>
+              </div>
+
+              {/* Warning if coordinates are missing */}
+              {(!envLatitude || !envLongitude) && (
+                <div style={{ background: "rgba(255, 149, 0, 0.08)", border: "1px solid rgba(255, 149, 0, 0.3)", borderRadius: "var(--radius-md)", padding: "8px 12px", margin: "4px 0", display: "flex", alignItems: "center", gap: "6px", color: "var(--amber)" }}>
+                  <span style={{ fontSize: "0.75rem", lineHeight: 1.3 }}>
+                    ⚠️ <strong>Ubicación pendiente:</strong> Para poder consultar Open-Meteo, debes ingresar coordenadas (Latitud/Longitud) y guardar.
+                  </span>
+                </div>
+              )}
+
+              {/* Save settings button */}
+              <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                <button
+                  type="submit"
+                  disabled={isSavingEnvSettings}
+                  className="profile-save-btn"
+                  style={{ flex: 1, padding: "8px 12px", fontSize: "0.82rem", height: "auto" }}
+                >
+                  {isSavingEnvSettings && <span className="btn-spinner" />}
+                  {isSavingEnvSettings ? "Guardando..." : "Guardar Ajustes"}
+                </button>
+
+                {envLatitude && envLongitude && (
+                  <button
+                    type="button"
+                    onClick={handleEnvForecastRefresh}
+                    disabled={isRefreshingEnvForecast}
+                    className="settings-action-btn primary"
+                    style={{ padding: "8px 12px", fontSize: "0.82rem", height: "auto", display: "flex", alignItems: "center", gap: "6px" }}
+                  >
+                    {isRefreshingEnvForecast ? <span className="btn-spinner" /> : <RefreshCw size={12} />}
+                    Sync Clima
+                  </button>
+                )}
+              </div>
+
+              {/* Cache status details */}
+              {environmentForecasts && environmentForecasts.length > 0 && (
+                <div style={{ marginTop: "8px", background: "var(--panel-2)", padding: "10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--line)" }}>
+                  <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", display: "block" }}>Estado del Caché del Clima</span>
+                  <div style={{ fontSize: "0.75rem", color: "var(--ink-2)", marginTop: "4px", display: "flex", flexDirection: "column", gap: "2px" }}>
+                    <span>Última sincronización: <strong>{new Date(environmentForecasts[0].fetched_at).toLocaleString("es-AR")}</strong></span>
+                    <span>Días en caché: <strong>{environmentForecasts.length} días</strong> ({environmentForecasts[0].forecast_date} a {environmentForecasts[environmentForecasts.length - 1].forecast_date})</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!envEnabled && (
+            <div style={{ padding: "0 20px 16px 20px" }}>
+              <button
+                type="submit"
+                disabled={isSavingEnvSettings}
+                className="profile-save-btn"
+                style={{ width: "100%", padding: "8px 12px", fontSize: "0.82rem", height: "auto" }}
+              >
+                {isSavingEnvSettings && <span className="btn-spinner" />}
+                Guardar Ajustes
+              </button>
+            </div>
+          )}
+        </form>
+      </div>
+
       {/* Theme toggle */}
       <div className="settings-section">
         <p className="settings-section-title">Apariencia</p>
@@ -1034,7 +1316,12 @@ export function DashboardTabs({
       <div style={{ paddingBottom: "16px" }}>
         {activeTab === "summary"     && renderSummaryTab()}
         {activeTab === "workout"     && <TrainingPanel advancedScores={advancedScores} showToast={showToast} />}
-        {activeTab === "log"         && <DashboardControlCenter />}
+        {activeTab === "log"         && (
+          <DashboardControlCenter 
+            environmentSettings={environmentSettings}
+            environmentForecasts={environmentForecasts}
+          />
+        )}
         {activeTab === "profile"     && renderProfile()}
       </div>
 

@@ -33,12 +33,22 @@ function useToast() {
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
-export function DashboardControlCenter() {
+export function DashboardControlCenter({
+  environmentSettings,
+  environmentForecasts
+}: {
+  environmentSettings?: any;
+  environmentForecasts?: any[];
+}) {
   const router = useRouter();
   const [activeSubTab, setActiveSubTab] = useState<"cardio" | "medidas" | "habitos">("cardio");
   const [isSaving, setIsSaving] = useState(false);
   const submittingRef = useRef(false);
   const { toasts, show: showToast } = useToast();
+
+  const todayStr = new Date().toLocaleDateString("en-CA");
+  const todayForecast = environmentForecasts?.find((f: any) => f.forecast_date === todayStr);
+  const isPressureHighToday = environmentSettings?.atmospheric_pressure_tracking_enabled && todayForecast?.crosses_threshold;
 
   const [useThreeReadings, setUseThreeReadings] = useState(false);
   const [reading1, setReading1] = useState({ sys: "", dia: "", pulse: "" });
@@ -177,6 +187,26 @@ export function DashboardControlCenter() {
         </div>
 
         <form onSubmit={handleLogSubmit} className="log-form-body" style={{ padding: "20px" }}>
+          {isPressureHighToday && (
+            <div style={{
+              background: "rgba(0, 122, 255, 0.06)",
+              borderLeft: "4px solid var(--accent)",
+              borderRadius: "var(--radius-sm)",
+              padding: "12px 16px",
+              marginBottom: "20px",
+              animation: "fade-in 0.4s ease both"
+            }}>
+              <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>ℹ️</span>
+                <div>
+                  <strong style={{ fontSize: "0.82rem", color: "var(--ink)" }}>Contexto ambiental: Presión atmosférica alta</strong>
+                  <p style={{ fontSize: "0.78rem", color: "var(--ink-2)", margin: "4px 0 0 0", lineHeight: 1.3 }}>
+                    Hoy se espera una presión de hasta {Math.round(todayForecast.pressure_msl_max_hpa)} hPa. Si registrás dolor de cabeza, migraña, fatiga inusual o molestias hoy, recordá detallarlo en esta sección.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           <input type="hidden" name="local_date" value={new Date().toLocaleDateString("en-CA")} />
 
           {/* TAB 1: CARDIO */}

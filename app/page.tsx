@@ -28,6 +28,8 @@ export default async function Home() {
         isGoogleHealthConnected={dashboard.isGoogleHealthConnected}
         advancedScores={advancedScores}
         anomalies={dashboard.anomalies}
+        environmentSettings={dashboard.environmentSettings}
+        environmentForecasts={dashboard.environmentForecasts}
       />
     </main>
   );

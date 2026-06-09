@@ -9,9 +9,12 @@ import type {
   BloodPressure,
   SyncRun,
   ScoreRow,
-  InsightRow
+  InsightRow,
+  UserEnvironmentSettings,
+  EnvironmentForecast
 } from "@/lib/types";
 import { scoreFromSteps, calculateAdvancedScores, type HealthScores } from "@/lib/scoring";
+import { updateUserForecasts } from "@/lib/environment";
 
 function formatNumber(value: number | null | undefined) {
   if (value === null || value === undefined || Number.isNaN(value)) return "sin dato";
@@ -103,7 +106,18 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
       dataCards: [],
       syncSummary: null,
       profile: null,
-      isGoogleHealthConnected: false
+      isGoogleHealthConnected: false,
+      environmentSettings: {
+        atmospheric_pressure_tracking_enabled: false,
+        atmospheric_pressure_threshold_hpa: 1025,
+        weather_provider: "open_meteo",
+        alert_sustained_pressure_only: true,
+        location_name: null,
+        location_latitude: null,
+        location_longitude: null,
+        location_timezone: null
+      },
+      environmentForecasts: []
     };
   }
 
@@ -123,7 +137,9 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
     oauthRow,
     workoutSessions,
     muscleVolumeWeekly,
-    recentSymptoms
+    recentSymptoms,
+    dbEnvSettings,
+    dbEnvForecasts
   ] = await Promise.all([
     safeQuery(
       supabase
@@ -234,6 +250,20 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
         .eq("user_id", userId)
         .order("date", { ascending: false })
         .limit(50)
+    ),
+    safeQuery(
+      supabase
+        .from("user_environment_settings")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle()
+    ),
+    safeQuery(
+      supabase
+        .from("environment_forecasts")
+        .select("*")
+        .eq("user_id", userId)
+        .order("forecast_date", { ascending: true })
     )
   ]);
   const profileRow = rawProfileRow as any;
@@ -496,6 +526,123 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
       })
     : [];
 
+  // ─── Climate / Environmental Settings & Cache ──────────────────
+  let envSettings = dbEnvSettings as UserEnvironmentSettings | null;
+  if (!envSettings) {
+    envSettings = {
+      user_id: userId,
+      atmospheric_pressure_tracking_enabled: false,
+      atmospheric_pressure_threshold_hpa: 1025,
+      weather_provider: "open_meteo",
+      alert_sustained_pressure_only: true,
+      location_name: null,
+      location_latitude: null,
+      location_longitude: null,
+      location_timezone: null
+    };
+  }
+
+  let envForecasts = (dbEnvForecasts ?? []) as EnvironmentForecast[];
+
+  if (
+    envSettings.atmospheric_pressure_tracking_enabled &&
+    envSettings.location_latitude !== null &&
+    envSettings.location_longitude !== null
+  ) {
+    const todayStr = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
+    const todayForecast = envForecasts.find(f => f.forecast_date === todayStr);
+
+    let needsRefresh = false;
+    if (envForecasts.length === 0 || !todayForecast) {
+      needsRefresh = true;
+    } else {
+      const fetchedAtTime = new Date(todayForecast.fetched_at).getTime();
+      const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
+      if (fetchedAtTime < twelveHoursAgo) {
+        needsRefresh = true;
+      }
+    }
+
+    if (needsRefresh) {
+      try {
+        console.log(`Auto-refreshing forecasts for user ${userId}...`);
+        const updated = await updateUserForecasts(supabase, userId, envSettings);
+        if (updated && updated.length > 0) {
+          envForecasts = updated;
+        }
+      } catch (err) {
+        console.error("Error doing auto-refresh of forecasts:", err);
+      }
+    }
+  }
+
+  // ─── Weather Alerts Generation ─────────────────────────────────
+  const weatherAlerts: Array<{
+    severity: "info" | "warning" | "critical";
+    category: "environment";
+    title: string;
+    message: string;
+    relatedMetric?: string;
+    date?: string;
+  }> = [];
+
+  const getSpanishWeekday = (dateStr: string): string => {
+    const parts = dateStr.split("-").map(Number);
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    const dayName = date.toLocaleDateString("es-AR", { weekday: "long" });
+    return dayName.charAt(0).toUpperCase() + dayName.slice(1);
+  };
+
+  if (
+    envSettings.atmospheric_pressure_tracking_enabled &&
+    envSettings.location_latitude !== null &&
+    envSettings.location_longitude !== null &&
+    envForecasts.length > 0
+  ) {
+    const todayStr = new Date().toLocaleDateString("en-CA");
+    
+    // 1. Today's forecast alert
+    const todayF = envForecasts.find(f => f.forecast_date === todayStr);
+    if (todayF && todayF.crosses_threshold) {
+      const isVeryHigh = todayF.pressure_msl_max_hpa >= 1030;
+      weatherAlerts.push({
+        severity: isVeryHigh ? ("warning" as const) : ("info" as const),
+        category: "environment",
+        title: isVeryHigh ? "Presión atmosférica muy alta prevista" : "Presión atmosférica alta prevista",
+        message: `Hoy se espera presión atmosférica de hasta ${Math.round(todayF.pressure_msl_max_hpa)} hPa. Si notás dolor de cabeza, rigidez o sueño raro, este dato puede servir como contexto.`,
+        relatedMetric: "pressure_msl",
+        date: todayStr
+      });
+    }
+
+    // 2. Future forecast alerts (next 6 days)
+    const futureF = envForecasts.filter(f => f.forecast_date > todayStr);
+    for (const f of futureF) {
+      if (f.crosses_threshold) {
+        const isVeryHigh = f.pressure_msl_max_hpa >= 1030;
+        weatherAlerts.push({
+          severity: isVeryHigh ? ("warning" as const) : ("info" as const),
+          category: "environment",
+          title: isVeryHigh ? "Presión atmosférica muy alta esta semana" : "Presión atmosférica alta esta semana",
+          message: `El ${getSpanishWeekday(f.forecast_date)} se espera una presión de hasta ${Math.round(f.pressure_msl_max_hpa)} hPa durante varias horas. La app lo registra como contexto ambiental; no modifica tus scores automáticamente.`,
+          relatedMetric: "pressure_msl",
+          date: f.forecast_date
+        });
+      }
+    }
+  }
+
+  // Inject weather alerts into advancedScores
+  if (advancedScores) {
+    if (!advancedScores.alerts) {
+      advancedScores.alerts = [];
+    }
+    // Filter out any existing environment alerts to avoid duplication
+    advancedScores.alerts = advancedScores.alerts.filter((a: any) => a.category !== "environment");
+    // Append the newly generated weather alerts
+    advancedScores.alerts.push(...weatherAlerts);
+  }
+
   return {
     isReal: true,
     day,
@@ -540,6 +687,8 @@ export async function getDashboardData(prefetchedUser?: Awaited<ReturnType<typeo
       gender: profileRow.gender || null,
       activity_level: profileRow.activity_level || null
     } : null,
-    isGoogleHealthConnected: Boolean(oauthRow)
+    isGoogleHealthConnected: Boolean(oauthRow),
+    environmentSettings: envSettings,
+    environmentForecasts: envForecasts
   };
 }

@@ -171,3 +171,41 @@ export type Anomaly = {
   body: string;
   severity: "warning" | "danger";
 };
+
+export type UserEnvironmentSettings = {
+  id?: string;
+  user_id: string;
+  atmospheric_pressure_tracking_enabled: boolean;
+  atmospheric_pressure_threshold_hpa: number;
+  weather_provider: string;
+  alert_sustained_pressure_only: boolean;
+  location_name: string | null;
+  location_latitude: number | null;
+  location_longitude: number | null;
+  location_timezone: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type EnvironmentForecast = {
+  id?: string;
+  user_id: string;
+  provider: string;
+  latitude: number;
+  longitude: number;
+  timezone: string;
+  forecast_date: string;
+  fetched_at: string;
+  pressure_msl_min_hpa: number;
+  pressure_msl_max_hpa: number;
+  pressure_msl_avg_hpa: number;
+  surface_pressure_min_hpa: number;
+  surface_pressure_max_hpa: number;
+  surface_pressure_avg_hpa: number;
+  high_pressure_hours: number;
+  threshold_hpa_used: number;
+  crosses_threshold: boolean;
+  raw_payload?: any;
+  created_at?: string;
+  updated_at?: string;
+};
